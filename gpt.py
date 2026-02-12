@@ -1,6 +1,7 @@
 import base64
 import concurrent.futures
 import time
+import os
 from openai import OpenAI
 from tqdm import tqdm
 
@@ -21,6 +22,9 @@ def encode_image(image_path):
 class GPT:
     def __init__(self, model="gpt-5.2", api_key=None, max_attempts=5, max_workers=80):
         self.model = model
+        if api_key is None:
+            print("api_key not found, using system env variable OPENAI_API_KEY")
+            api_key = os.getenv("OPENAI_API_KEY", "YOUR_API_KEY")
         self.client = OpenAI(api_key=api_key)
         self.max_attempts = max_attempts
         self.max_workers = max_workers
