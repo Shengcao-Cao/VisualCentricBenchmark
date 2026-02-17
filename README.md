@@ -241,38 +241,18 @@ DOT_PATH=C:\Program Files\Graphviz\bin\dot.exe
 
 ### Workflow
 
-```
-User Prompt
-     │
-     ▼
-┌─────────────┐
-│  Classifier  │  → diagram type + complexity score
-└──────┬──────┘
-       │
-       ▼
-┌─────────────┐
-│   Planner   │  → backend choice + structural spec (JSON)
-└──────┬──────┘
-       │
-       ▼
-┌──────────────┐
-│ Code Generator│  → TikZ / Python / DOT source
-└──────┬───────┘
-       │
-       ▼
-┌──────────────┐     ┌─────────────────┐
-│   Renderer   │────▶│  Error Handler  │
-└──────┬───────┘     │ (syntax errors, │
-       │              │  missing pkgs)  │
-       │              └────────┬────────┘
-       │                       │ retry with patch
-       ▼                       ▼
-┌──────────────┐     ┌─────────────────┐
-│  Validator   │────▶│  Repair Agent   │──▶ back to Code Gen
-└──────┬───────┘     └─────────────────┘
-       │  pass
-       ▼
-  Final Output (PNG)
+```mermaid
+flowchart TD
+    A([User Prompt]) --> B[Classifier\ndiagram type + complexity score]
+    B --> C[Planner\nbackend choice + structural spec]
+    C --> D[Code Generator\nTikZ / Python / DOT source]
+    D --> E[Renderer]
+    E -->|error| F[Error Handler\nsyntax errors, missing pkgs]
+    F -->|retry with patch| D
+    E -->|rendered PNG| G[Validator\nscore 0–10]
+    G -->|score below threshold| H[Repair Agent]
+    H --> D
+    G -->|pass| I([Final Output PNG])
 ```
 
 ### Backend selection
