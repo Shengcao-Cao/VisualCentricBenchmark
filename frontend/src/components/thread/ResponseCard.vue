@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <p v-if="turn.reply" class="reply">{{ turn.reply }}</p>
+    <div v-if="turn.reply" class="reply markdown" v-html="replyHtml" />
 
     <ProcessSteps :steps="turn.steps" />
     <RenderPreview :render-url="turn.renderUrl" />
@@ -33,13 +33,16 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from "vue";
 import type { ThreadTurn } from "../../types/domain";
+import { markdownToHtml } from "../../utils/markdown";
 import DownloadButton from "./DownloadButton.vue";
 import ProcessSteps from "./ProcessSteps.vue";
 import RenderPreview from "./RenderPreview.vue";
 import AppIcon from "../ui/AppIcon.vue";
 
-defineProps<{ turn: ThreadTurn }>();
+const props = defineProps<{ turn: ThreadTurn }>();
+const replyHtml = computed(() => markdownToHtml(props.turn.reply));
 </script>
 
 <style scoped>
@@ -89,11 +92,92 @@ defineProps<{ turn: ThreadTurn }>();
 
 .reply {
   margin: 0;
-  padding: 0 14px 10px;
-  color: #333;
-  font-size: 14px;
-  line-height: 1.5;
-  white-space: pre-wrap;
+  padding: 0 14px 6px;
+  color: #222;
+  font-family: "Georgia", "Iowan Old Style", "Palatino Linotype", "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.47;
+  letter-spacing: 0.01em;
+}
+
+.markdown :deep(p) {
+  margin: 0 0 5px;
+}
+
+.markdown :deep(p:last-child) {
+  margin-bottom: 0;
+}
+
+.markdown :deep(h1),
+.markdown :deep(h2),
+.markdown :deep(h3),
+.markdown :deep(h4),
+.markdown :deep(h5),
+.markdown :deep(h6) {
+  margin: 0 0 6px;
+  line-height: 1.15;
+  color: #111;
+  font-family: "Inter", "Segoe UI", sans-serif;
+  letter-spacing: -0.01em;
+  font-weight: 650;
+}
+
+.markdown :deep(h1) {
+  font-size: 1.55em;
+}
+
+.markdown :deep(h2) {
+  font-size: 1.35em;
+}
+
+.markdown :deep(h3) {
+  font-size: 1.2em;
+}
+
+.markdown :deep(ul),
+.markdown :deep(ol) {
+  margin: 0 0 5px;
+  padding-left: 16px;
+}
+
+.markdown :deep(li) {
+  margin: 0 0 1px;
+}
+
+.markdown :deep(blockquote) {
+  margin: 0 0 5px;
+  padding-left: 8px;
+  border-left: 3px solid #e5e5e5;
+  color: #5c5c5c;
+}
+
+.markdown :deep(code) {
+  font-family: "JetBrains Mono", "Cascadia Code", "Consolas", monospace;
+  font-size: 0.9em;
+  background: #f4f6f8;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.markdown :deep(pre) {
+  margin: 0 0 5px;
+  padding: 8px 10px;
+  background: #0f1720;
+  color: #eaf1f8;
+  border-radius: 8px;
+  overflow: auto;
+  line-height: 1.28;
+}
+
+.markdown :deep(pre code) {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  color: inherit;
+}
+
+.markdown :deep(a) {
+  color: #0d6e6e;
 }
 
 .footer {
