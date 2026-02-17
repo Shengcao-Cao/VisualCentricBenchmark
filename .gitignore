@@ -8,6 +8,7 @@ __pycache__/
 .*/
 
 node_modules/
+sessions/
 
 # Environment / secrets
 .env
