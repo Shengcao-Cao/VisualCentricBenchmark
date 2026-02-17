@@ -19,8 +19,9 @@ export function useConversation() {
   const { getRenderUrl } = useRenderImage();
 
   async function ensureSession(): Promise<string> {
-    if (sessionStore.selectedSessionId) {
-      return sessionStore.selectedSessionId;
+    const existing = await sessionStore.ensureSelectedExists();
+    if (existing) {
+      return existing;
     }
     return sessionStore.createAndSelect();
   }

@@ -17,18 +17,27 @@ defineProps<{ renderUrl: string | null }>();
 <style scoped>
 .preview {
   height: 220px;
-  display: grid;
-  place-items: center;
+  min-height: 220px;
+  max-height: 220px;
+  width: 100%;
+  position: relative;
   background: #f8f8f8;
+  overflow: hidden;
 }
 
 .preview img {
-  max-width: 100%;
-  max-height: 100%;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  display: block;
 }
 
 .placeholder {
+  height: 100%;
+  width: 100%;
+  justify-content: center;
   display: inline-flex;
   flex-direction: column;
   align-items: center;

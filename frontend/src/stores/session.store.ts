@@ -45,6 +45,21 @@ export const useSessionStore = defineStore("session", () => {
     persist();
   }
 
+  async function ensureSelectedExists(): Promise<string | null> {
+    while (selectedSessionId.value) {
+      const id = selectedSessionId.value;
+      try {
+        await getSession(id);
+        return id;
+      } catch {
+        sessions.value = sessions.value.filter((item) => item.id !== id);
+        selectedSessionId.value = sessions.value[0]?.id ?? null;
+        persist();
+      }
+    }
+    return null;
+  }
+
   async function createAndSelect(): Promise<string> {
     isBusy.value = true;
     try {
@@ -74,6 +89,7 @@ export const useSessionStore = defineStore("session", () => {
     isBusy,
     hydrate,
     select,
+    ensureSelectedExists,
     createAndSelect,
     updateMeta,
     persist

@@ -20,7 +20,9 @@ defineProps<{ turns: ThreadTurn[] }>();
 
 <style scoped>
 .thread {
+  height: 100%;
   padding: 24px 40px 0;
+  min-height: 0;
 }
 
 .inner {

@@ -9,10 +9,16 @@
   box-sizing: border-box;
 }
 
+html,
+body,
+#app {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  min-height: 100vh;
   background: #fafafa;
+  overflow: hidden;
 }
 
 button,
@@ -35,13 +41,15 @@ select {
 .app-shell {
   display: grid;
   grid-template-rows: 52px 1fr;
-  min-height: 100vh;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 .body-shell {
   display: grid;
   grid-template-columns: 256px 1fr;
-  min-height: calc(100vh - 52px);
+  height: 100%;
+  min-height: 0;
 }
 
 .sidebar {
@@ -54,6 +62,7 @@ select {
   display: grid;
   grid-template-rows: 1fr auto;
   overflow: hidden;
+  min-height: 0;
 }
 
 .scroll-y {
