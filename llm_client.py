@@ -20,6 +20,20 @@ def get_client():
     return anthropic.Anthropic()
 
 
+def get_async_client():
+    """Return an initialized *async* API client for the configured provider."""
+    if cfg.API_PROVIDER == "openai":
+        import openai
+        kwargs: dict = {
+            "base_url": cfg.OPENAI_BASE_URL or "https://api.openai.com/v1",
+        }
+        if cfg.OPENAI_API_KEY:
+            kwargs["api_key"] = cfg.OPENAI_API_KEY
+        return openai.AsyncOpenAI(**kwargs)
+    import anthropic
+    return anthropic.AsyncAnthropic()
+
+
 def anthropic_tools_to_openai(tools: list[dict]) -> list[dict]:
     """Convert Anthropic tool definitions to OpenAI function-calling format."""
     return [

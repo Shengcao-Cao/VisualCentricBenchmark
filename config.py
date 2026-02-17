@@ -31,3 +31,9 @@ MAX_AGENT_TURNS = int(os.environ.get("MAX_AGENT_TURNS", "20"))
 # Timeouts in seconds
 RENDER_TIMEOUT = int(os.environ.get("RENDER_TIMEOUT", "60"))
 SANDBOX_TIMEOUT = int(os.environ.get("SANDBOX_TIMEOUT", "30"))
+
+# Session / server settings
+SESSION_TTL_SECONDS = int(os.environ.get("SESSION_TTL_SECONDS", "3600"))
+MAX_SESSIONS = int(os.environ.get("MAX_SESSIONS", "100"))
+SERVER_HOST = os.environ.get("SERVER_HOST", "127.0.0.1")
+SERVER_PORT = int(os.environ.get("SERVER_PORT", "8000"))

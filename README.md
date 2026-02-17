@@ -87,6 +87,79 @@ Exit code `0` on success, `1` on failure.
 
 ---
 
+## Dialogue Server
+
+The agent can also run as a persistent HTTP server that supports multi-turn conversations. Each session keeps its full message history and a versioned render cache, so users can refine diagrams iteratively.
+
+### Start
+
+```bash
+uv run uvicorn server:app --reload
+# or
+uv run python server.py
+```
+
+Default: `http://127.0.0.1:8000`. Override with `SERVER_HOST` / `SERVER_PORT` in `.env`.
+
+### Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/sessions` | Create a session → `{"session_id": "..."}` |
+| `POST` | `/sessions/{id}/messages` | Send a message; returns SSE stream |
+| `GET` | `/sessions/{id}/renders/{render_id}` | Fetch a rendered PNG |
+| `GET` | `/sessions/{id}` | Session metadata |
+| `DELETE` | `/sessions/{id}` | Delete a session |
+
+Interactive API docs: `http://127.0.0.1:8000/docs`
+
+### Dialogue flow
+
+```bash
+# 1. Create a session
+curl -s -X POST http://localhost:8000/sessions
+# → {"session_id": "a3f9..."}
+
+# 2. Send a message (streams SSE)
+curl -s -N -X POST http://localhost:8000/sessions/a3f9.../messages \
+  -H "Content-Type: application/json" \
+  -d '{"content": "sine and cosine on [-2pi, 2pi]"}'
+
+# 3. Refine in the same session
+curl -s -N -X POST http://localhost:8000/sessions/a3f9.../messages \
+  -H "Content-Type: application/json" \
+  -d '{"content": "make the lines thicker and add grid lines"}'
+
+# 4. Fetch the latest rendered image
+curl -s http://localhost:8000/sessions/a3f9.../renders/v2 --output refined.png
+```
+
+### SSE event reference
+
+Every `POST /sessions/{id}/messages` response is a `text/event-stream`. Each frame:
+
+```
+event: <type>
+data: <json>
+
+```
+
+| Event | Payload | When |
+|-------|---------|------|
+| `text_delta` | `{"delta": "..."}` | Streaming text token from the model |
+| `tool_start` | `{"tool": "render_matplotlib", "input": "..."}` | Tool call dispatched |
+| `tool_result` | `{"tool": "render_matplotlib"}` | Tool call returned |
+| `render_ready` | `{"render_id": "v1", "backend": "matplotlib"}` | New PNG available — fetch via `/renders/{render_id}` |
+| `validate_result` | `{"render_id": "v1", "score": 8.5, "passed": true, "issues": [...], "suggestions": [...]}` | Visual validation ran |
+| `turn_complete` | `{"reply": "...", "render_id": "v1"}` | Agent finished; ready for next message |
+| `error` | `{"message": "..."}` | Unrecoverable error |
+
+### Render versioning
+
+Every successful render is stored in the session as `v1`, `v2`, etc. The session tracks `current_render_id` (always the latest). All previous renders remain accessible via `/renders/{render_id}` for the lifetime of the session (default TTL: 1 hour).
+
+---
+
 ## Configuration
 
 All settings are controlled by environment variables. Copy `.env.example` to `.env` and edit as needed.
@@ -132,6 +205,15 @@ DOT_PATH=C:\Program Files\Graphviz\bin\dot.exe
 |---|---|---|
 | `RENDER_TIMEOUT` | `60` | Seconds before a pdflatex or Graphviz subprocess is killed. |
 | `SANDBOX_TIMEOUT` | `30` | Seconds before the sandboxed Matplotlib subprocess is killed. |
+
+### Server / sessions
+
+| Variable | Default | Description |
+|---|---|---|
+| `SERVER_HOST` | `127.0.0.1` | Host the uvicorn server binds to. |
+| `SERVER_PORT` | `8000` | Port the uvicorn server listens on. |
+| `SESSION_TTL_SECONDS` | `3600` | Idle seconds before a session is eligible for cleanup. |
+| `MAX_SESSIONS` | `100` | Maximum concurrent sessions. New requests return `503` when the limit is reached. |
 
 ---
 
@@ -196,8 +278,11 @@ User Prompt
 ### File structure
 
 ```
-├── agent.py                    # CLI entry point + agentic loop
+├── agent.py                    # CLI entry point + agentic loop + run_turn_stream
+├── server.py                   # FastAPI dialogue server with SSE streaming
+├── session.py                  # ConversationSession + SessionStore
 ├── config.py                   # all settings (reads from env)
+├── llm_client.py               # sync + async provider abstraction
 ├── .env.example                # documented env var template
 │
 ├── backends/
@@ -215,7 +300,7 @@ User Prompt
 │
 ├── tools/
 │   ├── registry.py             # Anthropic tool_use JSON schemas
-│   └── implementations.py      # Python implementations; holds last-render state
+│   └── implementations.py      # Python implementations; render state lives in session
 │
 ├── prompts/
 │   ├── system.md               # agent system prompt
@@ -231,4 +316,6 @@ User Prompt
 
 **Sandboxed Matplotlib.** Generated Python runs in a subprocess with the `Agg` backend forced, `plt.show()` stripped, and a hard timeout. It cannot write outside the temp directory.
 
-**Stateless tools, stateful loop.** Each tool is a pure function (input → output). `_last_render` in `tools/implementations.py` is the only shared state — it lets `save_diagram` and `validate_visual` reference the most recent image without the agent passing raw bytes.
+**Session-scoped render state.** Each tool call receives the current `ConversationSession`. Renders are stored in `session.renders` as `{"v1": bytes, "v2": bytes, ...}`, so `save_diagram` and `validate_visual` reference the most recent image without the agent passing raw bytes, and all prior versions remain accessible for the lifetime of the session. The CLI creates an ephemeral single-use session; the server preserves sessions across requests.
+
+**Async streaming, sync backends.** The server's `run_turn_stream` is a fully async generator. Model responses stream token-by-token via the Anthropic async client. Backend subprocesses (pdflatex, dot, Matplotlib) are synchronous and run in a thread-pool executor so they don't block the event loop.
