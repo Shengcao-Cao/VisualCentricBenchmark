@@ -34,8 +34,15 @@ export const useThreadStore = defineStore("thread", () => {
   }
 
   function persist(): void {
+    const serializedTurnsBySession = Object.fromEntries(
+      Object.entries(turnsBySession.value).map(([sessionId, turns]) => [
+        sessionId,
+        turns.map((turn) => ({ ...turn, renderUrl: null }))
+      ])
+    );
+
     const payload: PersistedThreadState = {
-      turnsBySession: turnsBySession.value,
+      turnsBySession: serializedTurnsBySession,
       draftBySession: draftBySession.value
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -51,6 +58,8 @@ export const useThreadStore = defineStore("thread", () => {
 
       for (const turns of Object.values(turnsBySession.value)) {
         for (const turn of turns) {
+          // Object URLs are page-lifetime only; force regeneration from renderId on boot.
+          turn.renderUrl = null;
           // A page reload cannot continue a live stream; mark any stale stream as closed.
           if (turn.isStreaming) turn.isStreaming = false;
         }
