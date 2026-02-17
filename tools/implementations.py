@@ -12,10 +12,9 @@ import json
 import re
 from pathlib import Path
 
-import anthropic
-
 from backends import RenderResult, render_graphviz, render_matplotlib, render_tikz
 from config import BASE_DIR, DEFAULT_MODEL, OUTPUT_DIR
+from llm_client import simple_completion
 from validators.visual import validate_visual
 
 _CLASSIFY_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "classify.md"
@@ -47,15 +46,13 @@ def dispatch_tool(name: str, inputs: dict) -> str | list[dict]:
 # ── Individual implementations ────────────────────────────────────────────────
 
 def _classify_diagram(description: str) -> str:
-    client = anthropic.Anthropic()
     system = _CLASSIFY_PROMPT_PATH.read_text(encoding="utf-8")
-    response = client.messages.create(
+    return simple_completion(
+        messages=[{"role": "user", "content": description}],
+        system=system,
         model=DEFAULT_MODEL,
         max_tokens=256,
-        system=system,
-        messages=[{"role": "user", "content": description}],
     )
-    return response.content[0].text
 
 
 def _render(backend: str, source: str, **kwargs) -> str | list[dict]:

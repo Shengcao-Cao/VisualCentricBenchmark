@@ -15,7 +15,12 @@ TEMP_DIR.mkdir(exist_ok=True)
 PDFLATEX_PATH = os.environ.get("PDFLATEX_PATH", "pdflatex")
 DOT_PATH = os.environ.get("DOT_PATH", "dot")
 
-# Claude model
+# API provider: "anthropic" (default) or "openai" (any OpenAI-compatible endpoint)
+API_PROVIDER = os.environ.get("API_PROVIDER", "anthropic").lower()
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.environ.get("OPENAI_BASE_URL", "")
+
+# Model
 DEFAULT_MODEL = os.environ.get("DIAGRAM_MODEL", "claude-opus-4-6")
 
 # Agent settings

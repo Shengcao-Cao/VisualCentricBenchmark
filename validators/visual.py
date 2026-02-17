@@ -3,9 +3,8 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import anthropic
-
 from config import DEFAULT_MODEL
+from llm_client import simple_completion
 
 _VALIDATE_PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "validate.md"
 
@@ -20,14 +19,10 @@ class ValidationResult:
 
 
 def validate_visual(image_bytes: bytes, description: str) -> ValidationResult:
-    client = anthropic.Anthropic()
     system = _VALIDATE_PROMPT_PATH.read_text(encoding="utf-8")
     b64 = base64.standard_b64encode(image_bytes).decode()
 
-    response = client.messages.create(
-        model=DEFAULT_MODEL,
-        max_tokens=1024,
-        system=system,
+    raw = simple_completion(
         messages=[
             {
                 "role": "user",
@@ -50,9 +45,11 @@ def validate_visual(image_bytes: bytes, description: str) -> ValidationResult:
                 ],
             }
         ],
+        system=system,
+        model=DEFAULT_MODEL,
+        max_tokens=1024,
     )
 
-    raw = response.content[0].text
     try:
         data = json.loads(raw)
         score = float(data.get("score", 0))
@@ -64,7 +61,6 @@ def validate_visual(image_bytes: bytes, description: str) -> ValidationResult:
             raw_feedback=raw,
         )
     except (json.JSONDecodeError, ValueError):
-        # Fallback: unparseable response counts as a low score
         return ValidationResult(
             passed=False,
             score=0.0,

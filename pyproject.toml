@@ -5,6 +5,7 @@ description = "Diagram agent: textbook math diagrams via TikZ, Matplotlib, and G
 requires-python = ">=3.11"
 dependencies = [
     "anthropic>=0.79.0",
+    "openai>=1.0",
     "graphviz>=0.21",
     "matplotlib>=3.10.8",
     "pdf2image>=1.17.0",
