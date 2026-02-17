@@ -198,8 +198,11 @@ async def _stream_openai(
             messages=oai_messages,
             tools=oai_tools,
         ) as stream:
-            async for chunk in stream:
-                if not chunk.choices:
+            async for event in stream:
+                # OpenAI SDK may yield either raw chunk objects or wrapper events
+                # (e.g. ChunkEvent with a .chunk attribute), depending on version.
+                chunk = getattr(event, "chunk", event)
+                if not getattr(chunk, "choices", None):
                     continue
                 delta = chunk.choices[0].delta
                 if delta.content:

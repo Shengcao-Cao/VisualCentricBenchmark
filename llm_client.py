@@ -4,6 +4,28 @@ from __future__ import annotations
 import config as cfg
 
 
+def _make_schema_strict(schema: dict) -> dict:
+    """Return a deep-copied JSON schema with strict object constraints."""
+    if isinstance(schema, dict):
+        strict_schema = {k: _make_schema_strict(v) for k, v in schema.items()}
+        if strict_schema.get("type") == "object":
+            if "additionalProperties" not in strict_schema:
+                strict_schema["additionalProperties"] = False
+            props = strict_schema.get("properties")
+            if isinstance(props, dict):
+                prop_keys = list(props.keys())
+                required = strict_schema.get("required")
+                if isinstance(required, list):
+                    # Strict OpenAI schemas require every property to be listed in required.
+                    strict_schema["required"] = list(dict.fromkeys([*required, *prop_keys]))
+                else:
+                    strict_schema["required"] = prop_keys
+        return strict_schema
+    if isinstance(schema, list):
+        return [_make_schema_strict(item) for item in schema]
+    return schema
+
+
 def get_client():
     """Return an initialized API client for the configured provider."""
     if cfg.API_PROVIDER == "openai":
@@ -42,7 +64,8 @@ def anthropic_tools_to_openai(tools: list[dict]) -> list[dict]:
             "function": {
                 "name": t["name"],
                 "description": t["description"],
-                "parameters": t["input_schema"],
+                "parameters": _make_schema_strict(t["input_schema"]),
+                "strict": True,
             },
         }
         for t in tools
