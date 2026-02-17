@@ -113,6 +113,10 @@ async def send_message(session_id: str, body: MessageRequest):
     async def event_stream():
         try:
             async for event_type, payload in run_turn_stream(session, body.content):
+                # Persist session immediately before yielding render_ready so
+                # an immediate GET /renders/{render_id} will find the render.
+                if event_type == "render_ready":
+                    await asyncio.to_thread(store.update, session)
                 yield f"event: {event_type}\ndata: {json.dumps(payload)}\n\n"
         except Exception as exc:
             logger.exception("Error in agent turn for session %s", session_id)
