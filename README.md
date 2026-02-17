@@ -160,6 +160,26 @@ Every successful render is stored in the session as `v1`, `v2`, etc. The session
 
 ---
 
+## Vue 3 Frontend
+
+A Vue 3 + TypeScript frontend scaffold is included under `frontend/` and is wired to the dialogue API (`/sessions`, `/sessions/{id}/messages` SSE, `/renders/{render_id}`).
+
+### Start
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Use `.env.example` to override API base URL if needed:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+---
+
 ## Configuration
 
 All settings are controlled by environment variables. Copy `.env.example` to `.env` and edit as needed.
