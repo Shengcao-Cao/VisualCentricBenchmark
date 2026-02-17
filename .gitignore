@@ -5,3 +5,11 @@ __pycache__/
 /saves/
 
 /*.sh
+.*/
+
+# Environment / secrets
+.env
+
+# Generated output
+/output/
+/temp/
