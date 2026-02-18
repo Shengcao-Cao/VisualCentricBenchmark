@@ -51,13 +51,13 @@ export function useConversation() {
 
       if (event === "tool_start") {
         const payload = data as ToolStartPayload;
-        threadStore.startTool(sessionId, turnId, payload.tool, payload.input);
+        threadStore.startTool(sessionId, turnId, payload);
         return;
       }
 
       if (event === "tool_result") {
         const payload = data as ToolResultPayload;
-        threadStore.finishTool(sessionId, turnId, payload.tool);
+        threadStore.finishTool(sessionId, turnId, payload);
         return;
       }
 

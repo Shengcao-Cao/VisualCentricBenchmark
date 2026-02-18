@@ -162,6 +162,43 @@ async def get_session(session_id: str):
     }
 
 
+@app.get("/sessions/{session_id}/trace/{tool_use_id}")
+async def get_tool_trace(session_id: str, tool_use_id: str):
+    session = store.get(session_id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    trace = session.traces.get(tool_use_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail=f"Trace '{tool_use_id}' not found.")
+
+    return {
+        "tool_use_id": trace.get("tool_use_id", tool_use_id),
+        "tool": trace.get("tool"),
+        "input_full": trace.get("input_full_untruncated"),
+        "input_summary": trace.get("input_summary"),
+        "result_ok": trace.get("result_ok"),
+        "status": trace.get("status"),
+        "result_text": trace.get("result_text_untruncated"),
+        "result_summary": trace.get("result_summary"),
+        "started_at_ms": trace.get("started_at_ms"),
+        "ended_at_ms": trace.get("ended_at_ms"),
+        "duration_ms": trace.get("duration_ms"),
+        "started_ms": trace.get("started_at_ms"),
+        "ended_ms": trace.get("ended_at_ms"),
+        "truncated": {
+            "input_full": bool(trace.get("input_truncated")),
+            "result_text": bool(trace.get("result_truncated")),
+            "event": bool(trace.get("event_truncated")),
+        },
+        "full_size_bytes": {
+            "input_full": trace.get("input_full_size_bytes"),
+            "result_text": trace.get("result_text_size_bytes"),
+        },
+        "artifacts": trace.get("artifacts"),
+    }
+
+
 @app.delete("/sessions/{session_id}", status_code=204)
 async def delete_session(session_id: str):
     """Delete a session and free its memory."""

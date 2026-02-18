@@ -11,7 +11,7 @@ export function useSessionBoot(): void {
   onMounted(() => {
     void (async () => {
       sessionStore.hydrate();
-      threadStore.hydrate();
+      await threadStore.hydrate();
       threadStore.pruneSessions(sessionStore.sessions.map((item) => item.id));
 
       await sessionStore.ensureSelectedExists();

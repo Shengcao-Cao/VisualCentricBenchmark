@@ -27,6 +27,7 @@ class ConversationSession:
     messages: list[dict[str, object]] = field(default_factory=list)
     # Render history: render_id ("v1", "v2", …) → PNG bytes
     renders: dict[str, bytes] = field(default_factory=dict)
+    traces: dict[str, dict[str, object]] = field(default_factory=dict)
     current_render_id: str | None = None
     created_at: datetime = field(default_factory=_utcnow)
     last_activity: datetime = field(default_factory=_utcnow)
@@ -72,12 +73,26 @@ class SessionStore:
                 CREATE TABLE IF NOT EXISTS sessions (
                     id TEXT PRIMARY KEY,
                     messages_json TEXT NOT NULL,
+                    traces_json TEXT NOT NULL,
                     created_at TEXT NOT NULL,
                     last_activity TEXT NOT NULL,
                     current_render_id TEXT
                 )
                 """
             )
+            session_columns = cast(
+                list[tuple[object, ...]],
+                conn.execute("PRAGMA table_info(sessions)").fetchall(),
+            )
+            column_names = {
+                str(column[1])
+                for column in session_columns
+                if len(column) > 1
+            }
+            if "traces_json" not in column_names:
+                _ = conn.execute(
+                    "ALTER TABLE sessions ADD COLUMN traces_json TEXT NOT NULL DEFAULT '{}'"
+                )
             _ = conn.execute(
                 """
                 CREATE TABLE IF NOT EXISTS renders (
@@ -124,12 +139,13 @@ class SessionStore:
             with self._connect() as conn:
                 _ = conn.execute(
                     """
-                    INSERT INTO sessions (id, messages_json, created_at, last_activity, current_render_id)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO sessions (id, messages_json, traces_json, created_at, last_activity, current_render_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
                         session.id,
                         json.dumps(session.messages),
+                        json.dumps(session.traces),
                         self._serialize_dt(session.created_at),
                         self._serialize_dt(session.last_activity),
                         session.current_render_id,
@@ -141,10 +157,10 @@ class SessionStore:
         with self._lock:
             with self._connect() as conn:
                 row = cast(
-                    tuple[str, str, str, str | None] | None,
+                    tuple[str, str, str, str, str | None] | None,
                     conn.execute(
                     """
-                    SELECT messages_json, created_at, last_activity, current_render_id
+                    SELECT messages_json, traces_json, created_at, last_activity, current_render_id
                     FROM sessions
                     WHERE id = ?
                     """,
@@ -154,7 +170,7 @@ class SessionStore:
                 if row is None:
                     return None
 
-                messages_json, created_at_s, last_activity_s, current_render_id = row
+                messages_json, traces_json, created_at_s, last_activity_s, current_render_id = row
                 render_rows = cast(
                     list[tuple[str, str]],
                     conn.execute(
@@ -175,11 +191,18 @@ class SessionStore:
                     renders[render_id] = path.read_bytes()
 
             messages = cast(list[dict[str, object]], json.loads(messages_json))
+            traces_raw = cast(dict[str, object], json.loads(traces_json))
+            traces: dict[str, dict[str, object]] = {}
+            if isinstance(traces_raw, dict):
+                for tool_use_id, trace_payload in traces_raw.items():
+                    if isinstance(trace_payload, dict):
+                        traces[str(tool_use_id)] = cast(dict[str, object], trace_payload)
 
             return ConversationSession(
                 id=session_id,
                 messages=messages,
                 renders=renders,
+                traces=traces,
                 current_render_id=current_render_id,
                 created_at=self._parse_dt(created_at_s),
                 last_activity=self._parse_dt(last_activity_s),
@@ -233,6 +256,7 @@ class SessionStore:
                     """
                     UPDATE sessions
                     SET messages_json = ?,
+                        traces_json = ?,
                         created_at = ?,
                         last_activity = ?,
                         current_render_id = ?
@@ -240,6 +264,7 @@ class SessionStore:
                     """,
                     (
                         json.dumps(session.messages),
+                        json.dumps(session.traces),
                         self._serialize_dt(session.created_at),
                         self._serialize_dt(session.last_activity),
                         session.current_render_id,
