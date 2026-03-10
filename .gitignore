@@ -1,0 +1,13 @@
+# Data files (large)
+all_data.json
+all_figures/
+sampled_1000.json
+sampled_100.json
+final.json
+
+# Python
+__pycache__/
+*.pyc
+
+# Secrets
+run_pipeline.sh
