@@ -11,7 +11,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from client import OpenAIClient
+from client import ClaudeClient, GeminiClient, OpenAIClient
 from tasks.answer import run_answer
 from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
@@ -35,6 +35,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--api-key", default=None, help="API key (or set OPENAI_API_KEY)")
     parser.add_argument("--base-url", default=None, help="API base URL")
+    parser.add_argument("--region", default="us-east-2", help="AWS region for Bedrock (default: us-east-2)")
     parser.add_argument(
         "--base-dir",
         default=None,
@@ -49,11 +50,19 @@ async def main() -> None:
     data = load_dataset(args.input)
     base_dir = Path(args.base_dir) if args.base_dir else Path(args.input).parent
 
-    client = OpenAIClient(
-        model_name=args.model_name,
-        api_key=args.api_key,
-        base_url=args.base_url,
-    )
+    # if args.model_name.startswith("gemini"):
+    if "gemini" in args.model_name.lower():
+        client = GeminiClient(model_name=args.model_name, api_key=args.api_key)
+    elif "claude" in args.model_name.lower():
+        client = ClaudeClient(model_name=args.model_name, api_key=args.api_key, region=args.region)
+    elif "gpt" in args.model_name.lower():
+        client = OpenAIClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            base_url=args.base_url,
+        )
+    else:
+        raise ValueError(f"Unsupported model name: {args.model_name}")
     model_key = args.model_name
 
     if args.task == "answer":

@@ -17,8 +17,10 @@ def main():
     total_figures = 0
     missing = []
 
-    for dataset_dir in sorted(ROOT.iterdir()):
+    for dataset_dir in sorted(ROOT.parent.iterdir()):
         if not dataset_dir.is_dir():
+            continue
+        if dataset_dir.name in ("coreset", "raw", "figures_dist"):
             continue
         for jf in sorted(dataset_dir.glob("*.json")):
             with open(jf) as f:

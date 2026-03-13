@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coreset Viewer</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: #fff; border-bottom: 1px solid #ddd;
+    padding: 12px 24px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .top-bar label { font-weight: 600; font-size: 13px; color: #555; }
+  .top-bar select, .top-bar input[type=text] {
+    padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px;
+    background: #fff;
+  }
+  .top-bar input[type=text] { width: 200px; }
+  .top-bar .count { font-size: 13px; color: #888; margin-left: auto; }
+
+  .nav-bar {
+    position: sticky; top: 56px; z-index: 99;
+    background: #fafafa; border-bottom: 1px solid #e0e0e0;
+    padding: 8px 24px; display: flex; gap: 10px; align-items: center;
+  }
+  .nav-bar button {
+    padding: 6px 16px; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  .nav-bar button:hover { background: #eee; }
+  .nav-bar button:disabled { opacity: .4; cursor: default; }
+  .nav-bar .page-info { font-size: 13px; color: #666; }
+  .nav-bar .jump { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .nav-bar .jump input { width: 70px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+  .nav-bar .jump button { padding: 5px 12px; }
+
+  .cards { padding: 20px 24px; display: flex; flex-direction: column; gap: 20px; }
+
+  .card {
+    background: #fff; border-radius: 10px; border: 1px solid #e0e0e0;
+    overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  .card-header {
+    padding: 14px 20px; background: #f8f9fa; border-bottom: 1px solid #e8e8e8;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .card-header .id { font-weight: 700; font-size: 15px; color: #1a73e8; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.dataset { background: #e8f0fe; color: #1a73e8; }
+  .badge.domain { background: #fce8e6; color: #d93025; }
+  .badge.qtype { background: #e6f4ea; color: #137333; }
+  .badge.subdomain { background: #fef7e0; color: #b06000; }
+
+  .card-body { padding: 20px; }
+
+  .question-text {
+    font-size: 14px; line-height: 1.7; margin-bottom: 16px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .question-text .img-placeholder {
+    display: inline-block; vertical-align: middle;
+    background: #e8f0fe; color: #1a73e8; padding: 1px 6px;
+    border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .question-text .img-placeholder:hover { background: #c6dafa; }
+
+  .images-row {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;
+  }
+  .img-container {
+    border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+    background: #fafafa; text-align: center; max-width: 320px;
+  }
+  .img-container img {
+    display: block; max-width: 100%; max-height: 280px;
+    object-fit: contain; margin: 0 auto;
+  }
+  .img-container .img-label {
+    padding: 4px 8px; font-size: 11px; color: #666;
+    background: #f0f0f0; border-top: 1px solid #e0e0e0;
+  }
+
+  .options { margin-bottom: 12px; }
+  .option-item {
+    display: flex; gap: 8px; align-items: flex-start;
+    padding: 8px 12px; margin-bottom: 4px; border-radius: 6px;
+    font-size: 14px; line-height: 1.6;
+  }
+  .option-item.correct { background: #e6f4ea; }
+  .option-letter {
+    font-weight: 700; min-width: 20px; color: #555;
+  }
+  .option-item.correct .option-letter { color: #137333; }
+  .option-content { flex: 1; }
+  .option-content .img-placeholder {
+    display: inline-block; vertical-align: middle;
+    background: #e8f0fe; color: #1a73e8; padding: 1px 6px;
+    border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+
+  .answer-row {
+    display: flex; gap: 8px; align-items: center;
+    padding: 10px 14px; background: #f0faf0; border-radius: 6px;
+    font-size: 14px;
+  }
+  .answer-row strong { color: #137333; }
+  .answer-toggle { cursor: pointer; user-select: none; color: #1a73e8; font-weight: 600; font-size: 13px; }
+
+  .loading { text-align: center; padding: 60px; font-size: 18px; color: #888; }
+  .empty { text-align: center; padding: 60px; font-size: 16px; color: #999; }
+
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.85); align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  .lightbox.active { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <label>Dataset:</label>
+  <select id="filterDataset"><option value="">All</option></select>
+  <label>Domain:</label>
+  <select id="filterDomain"><option value="">All</option></select>
+  <label>Type:</label>
+  <select id="filterType"><option value="">All</option></select>
+  <label>Search:</label>
+  <input type="text" id="searchBox" placeholder="ID or keyword…">
+  <span class="count" id="countLabel"></span>
+</div>
+
+<div class="nav-bar">
+  <button id="btnFirst">⟨⟨ First</button>
+  <button id="btnPrev">⟨ Prev</button>
+  <span class="page-info" id="pageInfo"></span>
+  <button id="btnNext">Next ⟩</button>
+  <button id="btnLast">Last ⟩⟩</button>
+  <div class="jump">
+    <input type="text" id="jumpInput" placeholder="Page #">
+    <button id="btnJump">Go</button>
+  </div>
+</div>
+
+<div class="cards" id="cardContainer">
+  <div class="loading" id="loadingMsg">Loading data…</div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+const PAGE_SIZE = 20;
+let allData = [];
+let filtered = [];
+let page = 0;
+let answersRevealed = new Set();
+
+// --- Load data ---
+fetch('sampled_100.json')
+  .then(r => r.json())
+  .then(data => {
+    allData = data;
+    populateFilters();
+    applyFilters();
+    document.getElementById('loadingMsg').remove();
+  })
+  .catch(e => {
+    document.getElementById('loadingMsg').textContent = 'Failed to load all_data.json: ' + e.message;
+  });
+
+function populateFilters() {
+  const datasets = [...new Set(allData.map(d => d.dataset))].sort();
+  const domains = [...new Set(allData.map(d => d.domain).filter(Boolean))].sort();
+  const types = [...new Set(allData.map(d => d.question_type).filter(Boolean))].sort();
+
+  const selDS = document.getElementById('filterDataset');
+  datasets.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = `${v} (${allData.filter(d=>d.dataset===v).length})`; selDS.appendChild(o); });
+
+  const selDom = document.getElementById('filterDomain');
+  domains.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; selDom.appendChild(o); });
+
+  const selType = document.getElementById('filterType');
+  types.forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; selType.appendChild(o); });
+}
+
+function applyFilters() {
+  const ds = document.getElementById('filterDataset').value;
+  const dom = document.getElementById('filterDomain').value;
+  const qt = document.getElementById('filterType').value;
+  const search = document.getElementById('searchBox').value.toLowerCase().trim();
+
+  filtered = allData.filter(d => {
+    if (ds && d.dataset !== ds) return false;
+    if (dom && d.domain !== dom) return false;
+    if (qt && d.question_type !== qt) return false;
+    if (search && !d.id.toLowerCase().includes(search) && !d.question.toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  page = 0;
+  answersRevealed.clear();
+  render();
+}
+
+document.getElementById('filterDataset').addEventListener('change', applyFilters);
+document.getElementById('filterDomain').addEventListener('change', applyFilters);
+document.getElementById('filterType').addEventListener('change', applyFilters);
+let searchTimer;
+document.getElementById('searchBox').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(applyFilters, 300);
+});
+
+// --- Navigation ---
+function totalPages() { return Math.max(1, Math.ceil(filtered.length / PAGE_SIZE)); }
+
+document.getElementById('btnFirst').addEventListener('click', () => { page = 0; render(); });
+document.getElementById('btnPrev').addEventListener('click', () => { if (page > 0) { page--; render(); } });
+document.getElementById('btnNext').addEventListener('click', () => { if (page < totalPages() - 1) { page++; render(); } });
+document.getElementById('btnLast').addEventListener('click', () => { page = totalPages() - 1; render(); });
+document.getElementById('btnJump').addEventListener('click', () => {
+  const v = parseInt(document.getElementById('jumpInput').value);
+  if (v >= 1 && v <= totalPages()) { page = v - 1; render(); document.getElementById('jumpInput').value = ''; }
+});
+document.getElementById('jumpInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('btnJump').click(); });
+
+// --- Render ---
+function escapeHTML(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+}
+
+function renderImagePlaceholders(text, images) {
+  // Escape HTML first, then replace the now-escaped &lt;image_N&gt; tokens
+  const escaped = escapeHTML(text);
+  return escaped.replace(/&lt;image_(\d+)&gt;/g, (match, num) => {
+    const idx = parseInt(num) - 1;
+    if (images && images[idx]) {
+      return `<span class="img-placeholder" onclick="openLightbox('${images[idx]}')">[Image ${num}]</span>`;
+    }
+    return `<span class="img-placeholder">[Image ${num} - missing]</span>`;
+  });
+}
+
+function render() {
+  const container = document.getElementById('cardContainer');
+  const start = page * PAGE_SIZE;
+  const slice = filtered.slice(start, start + PAGE_SIZE);
+
+  document.getElementById('countLabel').textContent = `${filtered.length.toLocaleString()} samples`;
+  document.getElementById('pageInfo').textContent = `Page ${page + 1} of ${totalPages()}`;
+  document.getElementById('btnFirst').disabled = page === 0;
+  document.getElementById('btnPrev').disabled = page === 0;
+  document.getElementById('btnNext').disabled = page >= totalPages() - 1;
+  document.getElementById('btnLast').disabled = page >= totalPages() - 1;
+
+  if (slice.length === 0) {
+    container.innerHTML = '<div class="empty">No matching samples.</div>';
+    return;
+  }
+
+  container.innerHTML = slice.map((item, i) => {
+    const globalIdx = start + i;
+    const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const images = item.images || [];
+    const answerRaw = Array.isArray(item.answer) ? item.answer.join(', ') : (item.answer || '');
+    const answerLetters = answerRaw.split(',').map(s => s.trim());
+
+    // Question text with image placeholders
+    const qHTML = renderImagePlaceholders(item.question, images);
+
+    // Images gallery
+    let imagesHTML = '';
+    if (images.length > 0) {
+      imagesHTML = '<div class="images-row">' + images.map((src, j) => `
+        <div class="img-container">
+          <img src="${src}" alt="Image ${j+1}" loading="lazy" onclick="openLightbox('${src}')">
+          <div class="img-label">Image ${j+1}: ${src.split('/').pop()}</div>
+        </div>
+      `).join('') + '</div>';
+    }
+
+    // Options
+    let optionsHTML = '';
+    if (item.options && item.options.length > 0) {
+      optionsHTML = '<div class="options">' + item.options.map((opt, j) => {
+        const letter = letters[j];
+        const isCorrect = answerLetters.includes(letter);
+        const revealed = answersRevealed.has(globalIdx);
+        const cls = revealed && isCorrect ? 'correct' : '';
+        const content = renderImagePlaceholders(String(opt), images);
+        return `<div class="option-item ${cls}">
+          <span class="option-letter">${letter}.</span>
+          <span class="option-content">${content}${revealed && isCorrect ? ' ✓' : ''}</span>
+        </div>`;
+      }).join('') + '</div>';
+    }
+
+    // Answer row
+    const revealed = answersRevealed.has(globalIdx);
+    const answerHTML = revealed
+      ? `<div class="answer-row"><strong>Answer:</strong> ${escapeHTML(answerRaw)} <span class="answer-toggle" onclick="toggleAnswer(${globalIdx})">[hide]</span></div>`
+      : `<div class="answer-row"><span class="answer-toggle" onclick="toggleAnswer(${globalIdx})">Show answer</span></div>`;
+
+    return `<div class="card">
+      <div class="card-header">
+        <span class="id">${item.id}</span>
+        <span class="badge dataset">${item.dataset}</span>
+        <span class="badge domain">${escapeHTML(item.domain || '—')}</span>
+        <span class="badge qtype">${escapeHTML(item.question_type)}</span>
+        ${item.subdomain ? `<span class="badge subdomain">${escapeHTML(item.subdomain)}</span>` : ''}
+      </div>
+      <div class="card-body">
+        <div class="question-text">${qHTML}</div>
+        ${imagesHTML}
+        ${optionsHTML}
+        ${answerHTML}
+      </div>
+    </div>`;
+  }).join('');
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function toggleAnswer(idx) {
+  if (answersRevealed.has(idx)) answersRevealed.delete(idx);
+  else answersRevealed.add(idx);
+  render();
+}
+
+// --- Lightbox ---
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('active');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+});
+</script>
+</body>
+</html>

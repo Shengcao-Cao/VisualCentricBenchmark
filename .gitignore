@@ -1,13 +1,14 @@
-# Data files (large)
-all_data.json
-all_figures/
-sampled_1000.json
-sampled_100.json
-final.json
+# Data files
+*.json
+*.jpg
+*.png
+*.zip
+*.npz
+.DS_Store
 
 # Python
 __pycache__/
 *.pyc
 
-# Secrets
-run_pipeline.sh
+# Secret
+api_key.sh
