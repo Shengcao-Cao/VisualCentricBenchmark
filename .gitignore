@@ -5,6 +5,7 @@
 *.zip
 *.npz
 .DS_Store
+./playground/
 
 # Python
 __pycache__/

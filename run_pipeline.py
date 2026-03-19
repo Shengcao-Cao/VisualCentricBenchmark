@@ -7,6 +7,7 @@ Usage:
     python run_pipeline.py all     -i sampled_1000.json -o final.json --model-name gpt-5.4
 """
 
+import os
 import argparse
 import asyncio
 from pathlib import Path
@@ -16,6 +17,7 @@ from tasks.answer import run_answer
 from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
 from tasks.judge import run_judge
+from tasks.structured import run_structured
 from utils import load_dataset, save_dataset
 
 
@@ -23,7 +25,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "judge", "caption", "difficulty", "all"],
+        choices=["answer", "judge", "caption", "difficulty", "all", "structured"],
         help="Task to run",
     )
     parser.add_argument("-i", "--input", required=True, help="Input JSON path")
@@ -73,6 +75,8 @@ async def main() -> None:
         data = await run_caption(data, client, model_key, base_dir, args.concurrency)
     elif args.task == "difficulty":
         data = await run_difficulty(data, client, model_key, base_dir, args.concurrency)
+    elif args.task == "structured":
+        data = await run_structured(data, client, model_key, base_dir, args.concurrency)
     elif args.task == "all":
         # answer → judge → difficulty sequentially (each depends on prior)
         data = await run_answer(data, client, model_key, base_dir, args.concurrency)
@@ -80,6 +84,7 @@ async def main() -> None:
         data = await run_difficulty(data, client, model_key, base_dir, args.concurrency)
         data = await run_caption(data, client, model_key, base_dir, args.concurrency)
 
+    os.makedirs(Path(args.output).parent, exist_ok=True)
     save_dataset(data, args.output)
     print(f"Saved {len(data)} items to {args.output}")
 
