@@ -36,6 +36,9 @@ async def run_judge(
     model_key: str,
     base_dir: str | Path,
     concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
 ) -> list[dict]:
     """Judge each answer and store result under item["model"][model_key]["judge"]."""
     base_dir = Path(base_dir)
@@ -96,4 +99,7 @@ Model's answer: {model_answer}"""
         item.setdefault("model", {}).setdefault(model_key, {})["judge"] = judge_result
         return item
 
-    return await run_batch(data, process, concurrency=concurrency, desc="Judging")
+    return await run_batch(
+        data, process, concurrency=concurrency, desc="Judging",
+        skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
+    )

@@ -4,6 +4,7 @@
 *.png
 *.zip
 *.npz
+*.log
 .DS_Store
 ./playground/
 

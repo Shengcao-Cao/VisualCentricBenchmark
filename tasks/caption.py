@@ -21,6 +21,9 @@ async def run_caption(
     model_key: str,
     base_dir: str | Path,
     concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
 ) -> list[dict]:
     """Caption each image and store under item["model"][model_key]["captions"]."""
     base_dir = Path(base_dir)
@@ -46,4 +49,7 @@ async def run_caption(
         item.setdefault("model", {}).setdefault(model_key, {})["captions"] = captions
         return item
 
-    return await run_batch(data, process, concurrency=concurrency, desc="Captioning")
+    return await run_batch(
+        data, process, concurrency=concurrency, desc="Captioning",
+        skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
+    )

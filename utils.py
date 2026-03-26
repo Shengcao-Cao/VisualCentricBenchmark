@@ -62,14 +62,55 @@ async def run_batch(
     process_fn: Callable[[dict], Coroutine[Any, Any, dict]],
     concurrency: int = 10,
     desc: str = "Processing",
+    skip_fn: Callable[[dict], bool] | None = None,
+    output_path: str | Path | None = None,
+    save_interval: int = 0,
 ) -> list[dict]:
-    """Run an async function over a list of items with concurrency control."""
+    """Run an async function over a list of items with concurrency control.
+
+    Args:
+        skip_fn: If provided, items where skip_fn(item) is True are kept as-is.
+        output_path: Path to save intermediate results (required if save_interval > 0).
+        save_interval: Save results every N completed samples. 0 = disabled.
+    """
+    results: list[dict] = [None] * len(items)  # type: ignore[list-item]
+    to_process: list[tuple[int, dict]] = []
+
+    for i, item in enumerate(items):
+        if skip_fn and skip_fn(item):
+            results[i] = item
+        else:
+            to_process.append((i, item))
+
+    if skip_fn:
+        skipped = len(items) - len(to_process)
+        if skipped:
+            print(f"  Skipping {skipped}/{len(items)} already-completed samples")
+
+    if not to_process:
+        return results
+
     semaphore = asyncio.Semaphore(concurrency)
+    completed = 0
+    lock = asyncio.Lock()
 
-    async def wrapper(item: dict) -> dict:
+    async def wrapper(idx: int, item: dict) -> None:
+        nonlocal completed
         async with semaphore:
-            return await process_fn(item)
+            result = await process_fn(item)
+        results[idx] = result
+        async with lock:
+            completed += 1
+            if save_interval > 0 and output_path and completed % save_interval == 0:
+                save_dataset(results[:], output_path)
+                print(f"  Checkpoint saved ({completed}/{len(to_process)} done)")
 
-    tasks = [wrapper(item) for item in items]
-    results = await tqdm_asyncio.gather(*tasks, desc=desc)
-    return list(results)
+    tasks = [wrapper(idx, item) for idx, item in to_process]
+    await tqdm_asyncio.gather(*tasks, desc=desc)
+
+    # Final save if checkpointing was enabled
+    if save_interval > 0 and output_path:
+        save_dataset(results, output_path)
+        print(f"  Final checkpoint saved ({len(to_process)}/{len(to_process)} done)")
+
+    return results

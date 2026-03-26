@@ -2,12 +2,15 @@
 
 import asyncio
 import base64
+import io
 import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 
 import json
 import os
+
+from PIL import Image
 
 import boto3
 import botocore.config
@@ -20,10 +23,6 @@ logger = logging.getLogger(__name__)
 
 class VLMClient(ABC):
     """Base class for vision-language model clients."""
-
-    def __init__(self, model_name: str, max_retries: int = 5):
-        self.model_name = model_name
-        self.max_retries = max_retries
 
     @abstractmethod
     async def _call(
@@ -66,12 +65,63 @@ class VLMClient(ABC):
             return "image/gif"
         return "image/png"
 
+    # Default limits — subclasses or env vars can override
+    MAX_IMAGE_DIMENSION = 8000
+    MAX_IMAGE_BYTES = 0  # 0 = no file-size limit by default
+
+    def __init__(self, model_name: str, max_retries: int = 5):
+        self.model_name = model_name
+        self.max_retries = max_retries
+        # Allow env-var overrides: VLM_MAX_IMAGE_DIM, VLM_MAX_IMAGE_BYTES
+        self.max_image_dim = int(os.environ.get("VLM_MAX_IMAGE_DIM", self.MAX_IMAGE_DIMENSION))
+        self.max_image_bytes = int(os.environ.get("VLM_MAX_IMAGE_BYTES", self.MAX_IMAGE_BYTES))
+
     @staticmethod
-    def encode_image(image_path: str | Path) -> dict:
+    def _resize_if_needed(raw: bytes, max_dim: int, max_bytes: int = 0) -> bytes:
+        """Downscale image if dimensions exceed max_dim or size exceeds max_bytes."""
+        img = Image.open(io.BytesIO(raw))
+        orig_w, orig_h = img.size
+        fmt = img.format or ("PNG" if VLMClient._detect_mime(raw) == "image/png" else "JPEG")
+
+        # Step 1: dimension-based resize
+        w, h = orig_w, orig_h
+        if w > max_dim or h > max_dim:
+            scale = max_dim / max(w, h)
+            w, h = int(w * scale), int(h * scale)
+            img = img.resize((w, h), Image.LANCZOS)
+
+        # Step 2: file-size-based resize — progressively shrink until under limit
+        def _encode(image: Image.Image, fmt: str) -> bytes:
+            if fmt in ("JPEG", "WEBP") and image.mode in ("RGBA", "P"):
+                image = image.convert("RGB")
+            buf = io.BytesIO()
+            save_kwargs = {"format": fmt}
+            if fmt in ("JPEG", "WEBP"):
+                save_kwargs["quality"] = 85
+            image.save(buf, **save_kwargs)
+            return buf.getvalue()
+
+        result = _encode(img, fmt)
+        if max_bytes > 0:
+            while len(result) > max_bytes and max(w, h) > 256:
+                scale = 0.75
+                w, h = int(w * scale), int(h * scale)
+                img = img.resize((w, h), Image.LANCZOS)
+                result = _encode(img, fmt)
+
+        if (w, h) != (orig_w, orig_h):
+            logger.info(
+                "Resized image from %dx%d to %dx%d (%d bytes)",
+                orig_w, orig_h, w, h, len(result),
+            )
+        return result
+
+    def encode_image(self, image_path: str | Path) -> dict:
         """Encode a local image as a base64 data URL content part."""
         path = Path(image_path)
         with open(path, "rb") as f:
             raw = f.read()
+        raw = VLMClient._resize_if_needed(raw, self.max_image_dim, self.max_image_bytes)
         mime_type = VLMClient._detect_mime(raw)
         data = base64.b64encode(raw).decode("utf-8")
         return {
@@ -138,6 +188,9 @@ class ClaudeClient(VLMClient):
 
     Authenticates using AWS_BEARER_TOKEN_BEDROCK env var.
     """
+
+    # Bedrock enforces 5 MB base64 limit; 3.9 MB raw ≈ 5.2 MB encoded
+    MAX_IMAGE_BYTES = 3_900_000
 
     def __init__(
         self,

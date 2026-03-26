@@ -278,9 +278,8 @@ def plot_data_source(sources, out_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Visualize dataset distributions.")
-    parser.add_argument("input", type=Path, help="Path to input JSON file")
+    parser.add_argument("--input", type=Path, help="Path to input JSON file")
     parser.add_argument(
-        "-o",
         "--output",
         type=Path,
         default=None,

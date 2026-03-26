@@ -48,6 +48,9 @@ async def run_difficulty(
     model_key: str,
     base_dir: str | Path,
     concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
 ) -> list[dict]:
     """Rate difficulty and store under item["model"][model_key]["difficulty"]."""
     base_dir = Path(base_dir)
@@ -102,5 +105,6 @@ Ground-truth answer: {gt_answer}{model_info}"""
         return item
 
     return await run_batch(
-        data, process, concurrency=concurrency, desc="Rating difficulty"
+        data, process, concurrency=concurrency, desc="Rating difficulty",
+        skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
     )

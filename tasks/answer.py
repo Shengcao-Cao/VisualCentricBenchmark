@@ -40,6 +40,9 @@ async def run_answer(
     model_key: str,
     base_dir: str | Path,
     concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
 ) -> list[dict]:
     """Answer each question and store result under item["model"][model_key]["answer"]."""
     base_dir = Path(base_dir)
@@ -79,4 +82,7 @@ async def run_answer(
         item.setdefault("model", {}).setdefault(model_key, {})["answer"] = response
         return item
 
-    return await run_batch(data, process, concurrency=concurrency, desc="Answering")
+    return await run_batch(
+        data, process, concurrency=concurrency, desc="Answering",
+        skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
+    )
