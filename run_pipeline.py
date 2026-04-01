@@ -54,6 +54,12 @@ def parse_args() -> argparse.Namespace:
         default=0,
         help="Save intermediate results every N completed samples (0 = disabled)",
     )
+    parser.add_argument(
+        "--thinking-effort",
+        choices=["none", "low", "medium", "high"],
+        default="low",
+        help="Thinking/reasoning effort level (default: low)",
+    )
     return parser.parse_args()
 
 
@@ -86,14 +92,15 @@ async def main() -> None:
 
     # if args.model_name.startswith("gemini"):
     if "gemini" in args.model_name.lower():
-        client = GeminiClient(model_name=args.model_name, api_key=args.api_key)
+        client = GeminiClient(model_name=args.model_name, api_key=args.api_key, thinking_effort=args.thinking_effort)
     elif "claude" in args.model_name.lower():
-        client = ClaudeClient(model_name=args.model_name, api_key=args.api_key, region=args.region)
+        client = ClaudeClient(model_name=args.model_name, api_key=args.api_key, region=args.region, thinking_effort=args.thinking_effort)
     elif "gpt" in args.model_name.lower():
         client = OpenAIClient(
             model_name=args.model_name,
             api_key=args.api_key,
             base_url=args.base_url,
+            thinking_effort=args.thinking_effort,
         )
     else:
         raise ValueError(f"Unsupported model name: {args.model_name}")

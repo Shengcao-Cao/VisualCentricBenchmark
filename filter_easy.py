@@ -1,14 +1,23 @@
-"""Filter out problems that are too easy for all models.
+"""Filter out problems that are too easy for all models, with optional
+difficulty-based splits.
 
 A problem is removed if EITHER condition is met:
   1. All models answered correctly (judge.correct == True for every model).
   2. All models rated difficulty <= 3.
+
+With --splits, remaining problems are bucketed into difficulty tiers
+based on how many models answered correctly:
+  - hard:   0 models correct
+  - medium: 1 model correct
+  - easy:   2 models correct
+Each split is saved to <output_stem>_<split>.json.
 
 Accepts multiple input files. When more than one file is given, model data
 is merged by problem ID (only problems present in ALL inputs are kept).
 
 Usage:
     python filter_easy.py --input a.json b.json c.json --output filtered.json
+    python filter_easy.py --input a.json b.json c.json --output filtered.json --splits
 
 Defaults:
     --output filtered_data.json
@@ -16,6 +25,29 @@ Defaults:
 
 import argparse
 import json
+import re
+from pathlib import Path
+
+
+def detect_language(item: dict) -> str:
+    """Detect language from question text: 'zh' or 'en'."""
+    question = item.get("question", "")
+    if len(re.findall(r"[\u4e00-\u9fff]", question)) > 5:
+        return "zh"
+    return "en"
+
+
+def difficulty_split(item: dict) -> str:
+    """Assign a difficulty split based on number of models correct."""
+    models = item["model"]
+    n_correct = sum(
+        1 for m in models.values() if m.get("judge", {}).get("correct") is True
+    )
+    if n_correct == 0:
+        return "hard"
+    if n_correct == 1:
+        return "medium"
+    return "easy"
 
 
 def is_too_easy(item: dict) -> bool:
@@ -87,11 +119,18 @@ def main() -> None:
     parser.add_argument(
         "--output", default="filtered_data.json", help="Output JSON file"
     )
+    parser.add_argument(
+        "--splits",
+        action="store_true",
+        help="Also output difficulty splits (hard/medium/easy)",
+    )
     args = parser.parse_args()
 
     data = load_and_merge(args.input)
 
     kept = [item for item in data if not is_too_easy(item)]
+    for item in kept:
+        item["language"] = detect_language(item)
     removed = len(data) - len(kept)
 
     print(f"Total: {len(data)}")
@@ -101,6 +140,19 @@ def main() -> None:
     with open(args.output, "w") as f:
         json.dump(kept, f, indent=2, ensure_ascii=False)
     print(f"Saved to {args.output}")
+
+    if args.splits:
+        splits: dict[str, list[dict]] = {"hard": [], "medium": [], "easy": []}
+        for item in kept:
+            splits[difficulty_split(item)].append(item)
+
+        stem = Path(args.output).stem
+        parent = Path(args.output).parent
+        for split_name, items in splits.items():
+            split_path = parent / f"{stem}_{split_name}.json"
+            with open(split_path, "w") as f:
+                json.dump(items, f, indent=2, ensure_ascii=False)
+            print(f"  {split_name}: {len(items)} -> {split_path}")
 
 
 if __name__ == "__main__":

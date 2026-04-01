@@ -69,9 +69,18 @@ class VLMClient(ABC):
     MAX_IMAGE_DIMENSION = 8000
     MAX_IMAGE_BYTES = 0  # 0 = no file-size limit by default
 
-    def __init__(self, model_name: str, max_retries: int = 5):
+    # Valid thinking effort levels across providers
+    VALID_THINKING_EFFORTS = ("none", "low", "medium", "high")
+
+    def __init__(self, model_name: str, max_retries: int = 5, thinking_effort: str = "low"):
         self.model_name = model_name
         self.max_retries = max_retries
+        if thinking_effort not in self.VALID_THINKING_EFFORTS:
+            raise ValueError(
+                f"Invalid thinking_effort '{thinking_effort}', "
+                f"must be one of {self.VALID_THINKING_EFFORTS}"
+            )
+        self.thinking_effort = thinking_effort
         # Allow env-var overrides: VLM_MAX_IMAGE_DIM, VLM_MAX_IMAGE_BYTES
         self.max_image_dim = int(os.environ.get("VLM_MAX_IMAGE_DIM", self.MAX_IMAGE_DIMENSION))
         self.max_image_bytes = int(os.environ.get("VLM_MAX_IMAGE_BYTES", self.MAX_IMAGE_BYTES))
@@ -133,14 +142,18 @@ class VLMClient(ABC):
 class OpenAIClient(VLMClient):
     """OpenAI Responses API client with vision support."""
 
+    # OpenAI supports: none, minimal, low, medium, high, xhigh
+    _EFFORT_MAP = {"none": "none", "low": "low", "medium": "medium", "high": "high"}
+
     def __init__(
         self,
-        model_name: str,
+        model_name: str = "gpt-5.4",
         api_key: str | None = None,
         base_url: str | None = None,
         max_retries: int = 5,
+        thinking_effort: str = "low",
     ):
-        super().__init__(model_name, max_retries=max_retries)
+        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def _call(
@@ -154,13 +167,22 @@ class OpenAIClient(VLMClient):
             else:
                 input_messages.append(self._convert_message(msg))
 
+        reasoning = (
+            {"effort": self._EFFORT_MAP[self.thinking_effort]}
+            if self.thinking_effort != "none"
+            else None
+        )
+        # With reasoning enabled, max_output_tokens covers both reasoning + response tokens.
+        # OpenAI recommends ≥25,000 tokens; use at least 16,000 to avoid truncation.
+        effective_max = max(max_tokens, 16000) if reasoning else max_tokens
         kwargs = dict(
             model=self.model_name,
             input=input_messages,
-            reasoning={"effort": "low"},
-            max_output_tokens=max_tokens,
+            max_output_tokens=effective_max,
             temperature=temperature,
         )
+        if reasoning:
+            kwargs["reasoning"] = reasoning
         if instructions:
             kwargs["instructions"] = instructions
 
@@ -192,14 +214,18 @@ class ClaudeClient(VLMClient):
     # Bedrock enforces 5 MB base64 limit; 3.9 MB raw ≈ 5.2 MB encoded
     MAX_IMAGE_BYTES = 3_900_000
 
+    # Bedrock adaptive thinking + output_config effort: low, medium, high
+    _EFFORT_MAP = {"none": None, "low": "low", "medium": "medium", "high": "high"}
+
     def __init__(
         self,
-        model_name: str = "us.anthropic.claude-sonnet-4-20250514-v1:0",
+        model_name: str = "us.anthropic.claude-opus-4-6-v1",
         api_key: str | None = None,
         region: str = "us-west-2",
         max_retries: int = 5,
+        thinking_effort: str = "low",
     ):
-        super().__init__(model_name, max_retries=max_retries)
+        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
         token = api_key or os.environ["AWS_BEARER_TOKEN_BEDROCK"]
         session = boto3.Session()
         self.client = session.client(
@@ -222,12 +248,21 @@ class ClaudeClient(VLMClient):
             else:
                 api_messages.append(self._convert_message(msg))
 
+        effort = self._EFFORT_MAP[self.thinking_effort]
+        # With adaptive thinking, max_tokens covers both thinking + response tokens.
+        # Ensure enough headroom so the model doesn't exhaust budget during thinking.
+        effective_max = max(max_tokens, 16000) if effort else max_tokens
         body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": max_tokens,
+            "max_tokens": effective_max,
             "temperature": temperature,
             "messages": api_messages,
         }
+        if effort:
+            body["thinking"] = {"type": "adaptive"}
+            body["output_config"] = {"effort": effort}
+        else:
+            body["thinking"] = {"type": "disabled"}
         if system:
             body["system"] = system
 
@@ -239,7 +274,17 @@ class ClaudeClient(VLMClient):
             body=json.dumps(body),
         )
         result = json.loads(response["body"].read())
-        return result["content"][0]["text"]
+        # With thinking enabled, response may contain thinking blocks; extract the text block
+        for block in result["content"]:
+            if block.get("type") == "text":
+                return block["text"]
+        # No text block found — model likely exhausted max_tokens during thinking
+        stop = result.get("stop_reason", "unknown")
+        block_types = [b.get("type") for b in result.get("content", [])]
+        raise RuntimeError(
+            f"Claude response contained no text block (stop_reason={stop}, "
+            f"blocks={block_types}). Try increasing max_tokens or lowering thinking_effort."
+        )
 
     @staticmethod
     def _convert_message(msg: dict) -> dict:
@@ -270,13 +315,17 @@ class ClaudeClient(VLMClient):
 class GeminiClient(VLMClient):
     """Google Gemini API client with vision support."""
 
+    # Gemini 3.x thinking levels: minimal, low, medium, high
+    _EFFORT_MAP = {"none": "minimal", "low": "low", "medium": "medium", "high": "high"}
+
     def __init__(
         self,
         model_name: str = "gemini-3.1-pro-preview",
         api_key: str | None = None,
         max_retries: int = 5,
+        thinking_effort: str = "low",
     ):
-        super().__init__(model_name, max_retries=max_retries)
+        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
         self.client = genai.Client(api_key=api_key)
 
     async def _call(
@@ -290,7 +339,9 @@ class GeminiClient(VLMClient):
             config=types.GenerateContentConfig(
                 max_output_tokens=max_tokens,
                 temperature=temperature,
-                thinking_config=types.ThinkingConfig(thinking_level="low"),
+                thinking_config=types.ThinkingConfig(
+                    thinking_level=self._EFFORT_MAP[self.thinking_effort]
+                ),
             ),
         )
         return response.text
