@@ -12,4 +12,4 @@ python run_pipeline.py perception \
     --thinking-effort medium \
     --api-key $GOOGLE_API_KEY \
     --concurrency 50 --save-interval 1000 \
-    > atomic_captions3_perception.log 2>&1
+    >> atomic_captions3_perception.log 2>&1

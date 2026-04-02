@@ -17,6 +17,7 @@ from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
 from tasks.judge import run_judge
 from tasks.perception import run_perception
+from tasks.prune import run_prune
 from tasks.structured import run_structured
 from utils import load_dataset, save_dataset
 
@@ -25,7 +26,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "judge", "caption", "difficulty", "perception", "all", "structured"],
+        choices=["answer", "judge", "caption", "difficulty", "perception", "prune", "all", "structured"],
         help="Task to run",
     )
     parser.add_argument("-i", "--input", required=True, help="Input JSON path")
@@ -139,6 +140,9 @@ async def main() -> None:
     elif args.task == "perception":
         data = await run_perception(data, client, model_key, base_dir, args.concurrency,
                                     skip_fn=make_skip_fn(["perception"]), **common)
+    elif args.task == "prune":
+        data = await run_prune(data, client, model_key, base_dir, args.concurrency,
+                               skip_fn=make_skip_fn(["pruned_question"]), **common)
     elif args.task == "structured":
         data = await run_structured(data, client, model_key, base_dir, args.concurrency)
     elif args.task == "all":

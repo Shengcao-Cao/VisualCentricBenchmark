@@ -32,7 +32,7 @@ class VLMClient(ABC):
         ...
 
     async def chat(
-        self, messages: list[dict], max_tokens: int = 8192, temperature: float = 1.0
+        self, messages: list[dict], max_tokens: int = 20000, temperature: float = 1.0
     ) -> str:
         """Send a chat request with exponential backoff retry."""
         for attempt in range(self.max_retries):
@@ -172,13 +172,10 @@ class OpenAIClient(VLMClient):
             if self.thinking_effort != "none"
             else None
         )
-        # With reasoning enabled, max_output_tokens covers both reasoning + response tokens.
-        # OpenAI recommends ≥25,000 tokens; use at least 16,000 to avoid truncation.
-        effective_max = max(max_tokens, 16000) if reasoning else max_tokens
         kwargs = dict(
             model=self.model_name,
             input=input_messages,
-            max_output_tokens=effective_max,
+            max_output_tokens=max_tokens,
             temperature=temperature,
         )
         if reasoning:
@@ -249,12 +246,9 @@ class ClaudeClient(VLMClient):
                 api_messages.append(self._convert_message(msg))
 
         effort = self._EFFORT_MAP[self.thinking_effort]
-        # With adaptive thinking, max_tokens covers both thinking + response tokens.
-        # Ensure enough headroom so the model doesn't exhaust budget during thinking.
-        effective_max = max(max_tokens, 16000) if effort else max_tokens
         body = {
             "anthropic_version": "bedrock-2023-05-31",
-            "max_tokens": effective_max,
+            "max_tokens": max_tokens,
             "temperature": temperature,
             "messages": api_messages,
         }
@@ -328,6 +322,19 @@ class GeminiClient(VLMClient):
         super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
         self.client = genai.Client(api_key=api_key)
 
+    # Disable safety filters to avoid MALFORMED_RESPONSE / silent None returns.
+    # Only the 4 standard text categories are accepted by the API;
+    # image-specific and jailbreak categories cause INVALID_ARGUMENT errors.
+    _SAFETY_SETTINGS = [
+        types.SafetySetting(category=c, threshold=types.HarmBlockThreshold.OFF)
+        for c in [
+            types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+            types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+            types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+            types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        ]
+    ]
+
     async def _call(
         self, messages: list[dict], max_tokens: int, temperature: float
     ) -> str:
@@ -342,9 +349,28 @@ class GeminiClient(VLMClient):
                 thinking_config=types.ThinkingConfig(
                     thinking_level=self._EFFORT_MAP[self.thinking_effort]
                 ),
+                safety_settings=self._SAFETY_SETTINGS,
             ),
         )
-        return response.text
+        try:
+            text = response.text
+        except Exception:
+            text = None
+        if text is None:
+            # Gather diagnostic info safely
+            try:
+                cand = response.candidates[0] if response.candidates else None
+                finish = getattr(cand, 'finish_reason', 'unknown') if cand else 'no_candidates'
+                parts = cand.content.parts if (cand and cand.content) else []
+                part_info = [getattr(p, 'thought', False) for p in parts]
+            except Exception:
+                finish, part_info = 'unknown', []
+            raise RuntimeError(
+                f"Gemini returned no text (finish_reason={finish}, "
+                f"parts_are_thought={part_info}). "
+                f"Try increasing max_tokens or lowering thinking_effort."
+            )
+        return text
 
     @staticmethod
     def _convert_messages(messages: list[dict]) -> list[types.Content]:
