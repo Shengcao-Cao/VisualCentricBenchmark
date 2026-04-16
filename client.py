@@ -32,8 +32,10 @@ class VLMClient(ABC):
         ...
 
     async def chat(
-        self, messages: list[dict], max_tokens: int = 20000, temperature: float = 1.0
+        self, messages: list[dict], max_tokens: int | None = None, temperature: float = 1.0
     ) -> str:
+        if max_tokens is None:
+            max_tokens = self.max_tokens
         """Send a chat request with exponential backoff retry."""
         for attempt in range(self.max_retries):
             try:
@@ -72,7 +74,13 @@ class VLMClient(ABC):
     # Valid thinking effort levels across providers
     VALID_THINKING_EFFORTS = ("none", "low", "medium", "high")
 
-    def __init__(self, model_name: str, max_retries: int = 5, thinking_effort: str = "low"):
+    def __init__(
+        self,
+        model_name: str,
+        max_retries: int = 5,
+        thinking_effort: str = "low",
+        max_tokens: int = 64000,
+    ):
         self.model_name = model_name
         self.max_retries = max_retries
         if thinking_effort not in self.VALID_THINKING_EFFORTS:
@@ -81,6 +89,7 @@ class VLMClient(ABC):
                 f"must be one of {self.VALID_THINKING_EFFORTS}"
             )
         self.thinking_effort = thinking_effort
+        self.max_tokens = max_tokens
         # Allow env-var overrides: VLM_MAX_IMAGE_DIM, VLM_MAX_IMAGE_BYTES
         self.max_image_dim = int(os.environ.get("VLM_MAX_IMAGE_DIM", self.MAX_IMAGE_DIMENSION))
         self.max_image_bytes = int(os.environ.get("VLM_MAX_IMAGE_BYTES", self.MAX_IMAGE_BYTES))
@@ -152,8 +161,14 @@ class OpenAIClient(VLMClient):
         base_url: str | None = None,
         max_retries: int = 5,
         thinking_effort: str = "low",
+        max_tokens: int = 64000,
     ):
-        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
+        super().__init__(
+            model_name,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
         self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def _call(
@@ -177,6 +192,7 @@ class OpenAIClient(VLMClient):
             input=input_messages,
             max_output_tokens=max_tokens,
             temperature=temperature,
+            service_tier="flex",
         )
         if reasoning:
             kwargs["reasoning"] = reasoning
@@ -221,8 +237,14 @@ class ClaudeClient(VLMClient):
         region: str = "us-west-2",
         max_retries: int = 5,
         thinking_effort: str = "low",
+        max_tokens: int = 64000,
     ):
-        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
+        super().__init__(
+            model_name,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
         token = api_key or os.environ["AWS_BEARER_TOKEN_BEDROCK"]
         session = boto3.Session()
         self.client = session.client(
@@ -318,8 +340,14 @@ class GeminiClient(VLMClient):
         api_key: str | None = None,
         max_retries: int = 5,
         thinking_effort: str = "low",
+        max_tokens: int = 64000,
     ):
-        super().__init__(model_name, max_retries=max_retries, thinking_effort=thinking_effort)
+        super().__init__(
+            model_name,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
         self.client = genai.Client(api_key=api_key)
 
     # Disable safety filters to avoid MALFORMED_RESPONSE / silent None returns.

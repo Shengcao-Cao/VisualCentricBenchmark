@@ -62,6 +62,12 @@ def parse_args() -> argparse.Namespace:
         default="low",
         help="Thinking/reasoning effort level (default: low)",
     )
+    parser.add_argument(
+        "--max-tokens",
+        type=int,
+        default=64000,
+        help="Max output tokens per request (default: 64000)",
+    )
     return parser.parse_args()
 
 
@@ -94,15 +100,27 @@ async def main() -> None:
 
     # if args.model_name.startswith("gemini"):
     if "gemini" in args.model_name.lower():
-        client = GeminiClient(model_name=args.model_name, api_key=args.api_key, thinking_effort=args.thinking_effort)
+        client = GeminiClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
     elif "claude" in args.model_name.lower():
-        client = ClaudeClient(model_name=args.model_name, api_key=args.api_key, region=args.region, thinking_effort=args.thinking_effort)
+        client = ClaudeClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            region=args.region,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
     elif "gpt" in args.model_name.lower():
         client = OpenAIClient(
             model_name=args.model_name,
             api_key=args.api_key,
             base_url=args.base_url,
             thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
         )
     else:
         raise ValueError(f"Unsupported model name: {args.model_name}")
