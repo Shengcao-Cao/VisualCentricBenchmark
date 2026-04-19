@@ -5,6 +5,10 @@ Usage:
     python run_pipeline.py judge   -i out1.json         -o out2.json --model-name gpt-5.4
     python run_pipeline.py caption -i out2.json         -o out3.json --model-name gpt-5.4
     python run_pipeline.py all     -i sampled_1000.json -o final.json --model-name gpt-5.4
+
+    # Tier 1 visual perception
+    python run_pipeline.py generate_tier1     -i data.json -o out.json --model-name gpt-5.4
+    python run_pipeline.py reference_answer_tier1  -i out.json  -o out.json --model-name gpt-5.4
 """
 
 import argparse
@@ -18,6 +22,8 @@ from tasks.difficulty import run_difficulty
 from tasks.judge import run_judge
 from tasks.perception import run_perception
 from tasks.prune import run_prune
+from tasks.generate_tier1 import run_generate_tier1
+from tasks.reference_answer_tier1 import run_reference_answer_tier1
 from tasks.structured import run_structured
 from utils import load_dataset, save_dataset
 
@@ -26,7 +32,8 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "judge", "caption", "difficulty", "perception", "prune", "all", "structured"],
+        choices=["answer", "judge", "caption", "difficulty", "perception", "prune", "all", "structured",
+                 "generate_tier1", "reference_answer_tier1"],
         help="Task to run",
     )
     parser.add_argument("-i", "--input", required=True, help="Input JSON path")
@@ -143,6 +150,24 @@ async def main() -> None:
 
     common = dict(output_path=output_path, save_interval=save_interval)
 
+    def generate_tier1_skip(item: dict) -> bool:
+        """Skip if tier1_questions already exists and is non-empty."""
+        if not args.skip_existing or item is None:
+            return False
+        return bool(item.get("tier1_questions"))
+
+    def reference_answers_skip(item: dict) -> bool:
+        """Skip only if every question already has a vote from this model."""
+        if not args.skip_existing or item is None:
+            return False
+        qs = item.get("tier1_questions") or []
+        if not qs:
+            return True
+        return all(
+            model_key in (q.get("reference_answers", {}).get("model_votes") or {})
+            for q in qs
+        )
+
     if args.task == "answer":
         data = await run_answer(data, client, model_key, base_dir, args.concurrency,
                                 skip_fn=make_skip_fn(["answer"]), **common)
@@ -163,6 +188,16 @@ async def main() -> None:
                                skip_fn=make_skip_fn(["pruned_question"]), **common)
     elif args.task == "structured":
         data = await run_structured(data, client, model_key, base_dir, args.concurrency)
+    elif args.task == "generate_tier1":
+        data = await run_generate_tier1(
+            data, client, model_key, base_dir, args.concurrency,
+            skip_fn=generate_tier1_skip, **common,
+        )
+    elif args.task == "reference_answer_tier1":
+        data = await run_reference_answer_tier1(
+            data, client, model_key, base_dir, args.concurrency,
+            skip_fn=reference_answers_skip, **common,
+        )
     elif args.task == "all":
         data = await run_answer(data, client, model_key, base_dir, args.concurrency,
                                 skip_fn=make_skip_fn(["answer"]), **common)

@@ -224,7 +224,7 @@ let revealAll = false;
 let revealedT1 = new Set();  // keys like "globalIdx:t1Idx"
 
 // --- Load data ---
-fetch('filtered_data_with_solution_hard_tier1.json')
+fetch('filtered_data_with_solution_hard_tier1_fixed.json')
   .then(r => r.json())
   .then(data => {
     // Only keep items that have tier1_questions

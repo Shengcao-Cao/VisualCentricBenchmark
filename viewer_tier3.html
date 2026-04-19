@@ -194,7 +194,7 @@
 </div>
 
 <div class="cards" id="cardContainer">
-  <div class="loading" id="loadingMsg">Loading tier3_sample.json…</div>
+  <div class="loading" id="loadingMsg">Loading pipeline_B_filtered_hard_results.json…</div>
 </div>
 
 <div class="lightbox" id="lightbox">
@@ -208,7 +208,7 @@ let filtered = [];
 let page = 0;
 
 // --- Load data ---
-fetch('tier3_sample.json')
+fetch('pipeline_B_filtered_hard_results.json')
   .then(r => r.json())
   .then(data => {
     allData = (data.tasks || []).filter(t => t.status === 'completed');
@@ -218,7 +218,7 @@ fetch('tier3_sample.json')
     if (lm) lm.remove();
   })
   .catch(e => {
-    document.getElementById('loadingMsg').textContent = 'Failed to load tier3_sample.json: ' + e.message;
+    document.getElementById('loadingMsg').textContent = 'Failed to load pipeline_B_filtered_hard_results.json: ' + e.message;
   });
 
 function getOrig(t, key) {

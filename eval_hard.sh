@@ -93,7 +93,7 @@ python run_pipeline.py answer \
     --thinking-effort high \
     --api-key $ANTHROPIC_API_KEY \
     --region us-east-2 \
-    --concurrency 100 --save-interval 100 \
+    --concurrency 10 --save-interval 20 \
     --skip-existing \
     > filtered_data_with_solution_hard_claude_sonnet_4_6.log 2>&1
 
@@ -103,5 +103,5 @@ python run_pipeline.py judge \
     --thinking-effort high \
     --api-key $ANTHROPIC_API_KEY \
     --region us-east-2 \
-    --concurrency 100 --save-interval 100 \
+    --concurrency 10 --save-interval 20 \
     >> filtered_data_with_solution_hard_claude_sonnet_4_6.log 2>&1
