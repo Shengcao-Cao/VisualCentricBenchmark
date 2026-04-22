@@ -290,17 +290,21 @@ class ClaudeClient(VLMClient):
             body=json.dumps(body),
         )
         result = json.loads(response["body"].read())
-        # With thinking enabled, response may contain thinking blocks; extract the text block
+        parts = []
         for block in result["content"]:
-            if block.get("type") == "text":
-                return block["text"]
-        # No text block found — model likely exhausted max_tokens during thinking
-        stop = result.get("stop_reason", "unknown")
-        block_types = [b.get("type") for b in result.get("content", [])]
-        raise RuntimeError(
-            f"Claude response contained no text block (stop_reason={stop}, "
-            f"blocks={block_types}). Try increasing max_tokens or lowering thinking_effort."
-        )
+            if block.get("type") == "thinking":
+                parts.append(block["thinking"])
+            elif block.get("type") == "text":
+                parts.append(block["text"])
+
+        if not parts:
+            stop = result.get("stop_reason", "unknown")
+            block_types = [b.get("type") for b in result.get("content", [])]
+            raise RuntimeError(
+                f"Claude response contained no content blocks (stop_reason={stop}, "
+                f"blocks={block_types}). Try increasing max_tokens or lowering thinking_effort."
+            )
+        return "\n\n".join(parts)
 
     @staticmethod
     def _convert_message(msg: dict) -> dict:
