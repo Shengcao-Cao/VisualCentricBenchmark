@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tier1 / Tier2 Annotator</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="window.__katexReady=true; if (typeof maybeRenderLatex==='function') maybeRenderLatex();"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: #fff; border-bottom: 1px solid #ddd;
+    padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .top-bar label { font-weight: 600; font-size: 13px; color: #555; }
+  .top-bar input[type=text] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 280px; }
+  .top-bar .progress { font-size: 13px; color: #444; }
+  .top-bar .progress .done { color: #137333; font-weight: 700; }
+  .top-bar .status { font-size: 12px; color: #888; margin-left: auto; min-width: 140px; text-align: right; }
+  .top-bar .status.error { color: #d93025; }
+  .top-bar .status.ok { color: #137333; }
+  .top-bar button {
+    padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  .top-bar button:hover { background: #eee; }
+  .top-bar button.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  .top-bar button.primary:hover { background: #1557b0; }
+
+  .nav-bar {
+    position: sticky; top: 52px; z-index: 99;
+    background: #fafafa; border-bottom: 1px solid #e0e0e0;
+    padding: 8px 20px; display: flex; gap: 8px; align-items: center;
+  }
+  .nav-bar button {
+    padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  .nav-bar button:hover { background: #eee; }
+  .nav-bar button:disabled { opacity: .4; cursor: default; }
+  .nav-bar .page-info { font-size: 13px; color: #666; margin: 0 8px; }
+  .nav-bar .jump { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .nav-bar .jump input { width: 80px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+
+  .layout {
+    display: grid; grid-template-columns: 2fr 3fr; gap: 16px; padding: 16px 20px;
+    height: calc(100vh - 108px);   /* top-bar (~52) + nav-bar (~40) + 16 padding */
+    overflow: hidden;
+  }
+  .panel { overflow: auto; max-height: 100%; }
+  @media (max-width: 1000px) {
+    .layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
+    .panel { overflow: visible; max-height: none; }
+  }
+
+  .panel {
+    background: #fff; border-radius: 10px; border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  .panel-header {
+    padding: 12px 18px; background: #f8f9fa; border-bottom: 1px solid #e8e8e8;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .panel-header .id { font-weight: 700; font-size: 14px; color: #1a73e8; }
+  .panel-header .finished-chip { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eceff1; color: #546e7a; }
+  .panel-header .finished-chip.done { background: #e6f4ea; color: #137333; }
+  .panel-body { padding: 16px 18px; }
+
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.dataset { background: #e8f0fe; color: #1a73e8; }
+  .badge.domain { background: #fce8e6; color: #d93025; }
+  .badge.qtype { background: #e6f4ea; color: #137333; }
+  .badge.subdomain { background: #fef7e0; color: #b06000; }
+
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: #888; letter-spacing: .5px; margin: 12px 0 6px;
+  }
+
+  .question-text {
+    font-size: 14px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word; margin-bottom: 12px;
+  }
+  .img-placeholder {
+    display: inline-block; vertical-align: middle;
+    background: #e8f0fe; color: #1a73e8; padding: 1px 6px;
+    border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .img-placeholder:hover { background: #c6dafa; }
+
+  .images-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .img-container {
+    border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+    background: #fafafa; text-align: center; max-width: 280px;
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .img-container.focus {
+    border-color: #1a73e8; box-shadow: 0 0 0 3px rgba(26,115,232,.25);
+  }
+  .img-container img {
+    display: block; max-width: 100%; max-height: 240px;
+    object-fit: contain; margin: 0 auto; cursor: zoom-in;
+  }
+  .img-container .img-label {
+    padding: 4px 8px; font-size: 11px; color: #666;
+    background: #f0f0f0; border-top: 1px solid #e0e0e0;
+  }
+
+  .review-cards { display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    border: 1px solid #d8dde4; border-radius: 10px; background: #fff; overflow: hidden;
+  }
+  .card.done { border-color: #b6dcbf; background: #f5fbf6; }
+  .card-head {
+    padding: 10px 14px; background: #f8f9fa; border-bottom: 1px solid #e8e8e8;
+    display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  }
+  .card.done .card-head { background: #edf8ee; }
+  .card-body { padding: 14px; }
+
+  .t1-type-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 700;
+  }
+  .t1-type-A { background: #e0f2f1; color: #00695c; }
+  .t1-type-B { background: #ede7f6; color: #4527a0; }
+  .t1-type-C { background: #fff3e0; color: #e65100; }
+  .t1-tier-badge { background: #e3f2fd; color: #0d47a1; }
+  .t1-img-chip {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    background: #e8f0fe; color: #1a73e8; font-size: 11px; font-weight: 600;
+    cursor: pointer;
+  }
+  .t1-img-chip:hover { background: #c6dafa; }
+  .t1-qid { font-size: 11px; color: #999; font-family: monospace; }
+
+  .t1-question {
+    font-size: 13px; line-height: 1.55; margin-bottom: 10px;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .t1-options { margin-bottom: 8px; }
+  .t1-option {
+    display: flex; gap: 8px; padding: 4px 10px; margin-bottom: 3px;
+    border-radius: 5px; font-size: 13px; line-height: 1.5;
+  }
+  .t1-option-letter { font-weight: 700; min-width: 18px; color: #555; }
+
+  .vote-row { display: flex; flex-wrap: wrap; gap: 5px; font-size: 11px; margin-bottom: 10px; align-items: center; }
+  .vote-row .label { color: #666; margin-right: 3px; }
+  .vote-pill {
+    display: inline-block; padding: 1px 7px; border-radius: 10px;
+    font-size: 11px; font-family: monospace;
+  }
+  .vote-pill.gen { background: #e8f0fe; color: #1a73e8; }
+  .vote-pill.match { background: #e6f4ea; color: #137333; }
+  .vote-pill.mismatch { background: #fce8e6; color: #d93025; }
+
+  .t1-thumb-row { margin: 8px 0 12px; }
+  .t1-thumb {
+    display: inline-block; border: 1px solid #e0e0e0; border-radius: 6px;
+    padding: 4px; background: #fafafa; cursor: zoom-in;
+  }
+  .t1-thumb img { display: block; max-width: 160px; max-height: 140px; object-fit: contain; }
+  .t1-thumb .thumb-label { font-size: 10px; color: #666; text-align: center; margin-top: 3px; }
+
+  .annot-box {
+    border-top: 1px dashed #d8dde4; padding-top: 10px; margin-top: 4px;
+  }
+  .annot-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+  .annot-row label { font-size: 13px; color: #444; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  .annot-row label input[type=radio] { margin: 0; }
+  .annot-row .radio-reasonable input:checked ~ span,
+  .annot-row .label-reasonable:has(input:checked) { color: #137333; font-weight: 700; }
+  .annot-row .label-minor_fix:has(input:checked) { color: #b06000; font-weight: 700; }
+  .annot-row .label-drop:has(input:checked) { color: #d93025; font-weight: 700; }
+
+  .opt-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+  .opt-row .opt-pill {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 4px 10px; border: 1px solid #c8d0da; border-radius: 6px;
+    background: #fff; font-size: 13px; cursor: pointer; user-select: none;
+  }
+  .opt-row .opt-pill:hover { background: #f0f4f8; }
+  .opt-row .opt-pill input { margin: 0; }
+  .opt-row .opt-pill.checked { border-color: #1a73e8; background: #e8f0fe; color: #1a73e8; font-weight: 700; }
+
+  .comment-input {
+    width: 100%; padding: 6px 10px; border: 1px solid #c8d0da; border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+  }
+
+  /* Tier2 */
+  .t2-card { border-color: #c9d9f0; }
+  .t2-card .card-head { background: #eef4fd; }
+  .t2-label { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #555; margin-bottom: 4px; }
+  .t2-pruned {
+    font-size: 13px; line-height: 1.55; padding: 8px 12px;
+    background: #f8f9fa; border-radius: 6px; white-space: pre-wrap; word-break: break-word;
+    margin-bottom: 10px;
+  }
+  .t2-hint {
+    font-size: 12px; line-height: 1.5; padding: 8px 12px;
+    background: #fff8e1; border-left: 3px solid #f6bf26; border-radius: 4px;
+    margin-bottom: 8px; white-space: pre-wrap; word-break: break-word;
+  }
+  .t2-collapsible {
+    background: #f3f6fb; border-left: 3px solid #4a6fb5; border-radius: 4px;
+    padding: 6px 10px; margin-bottom: 8px; font-size: 12px;
+  }
+  .t2-collapsible summary { cursor: pointer; font-weight: 700; color: #4a6fb5; user-select: none; }
+  .t2-collapsible[open] summary { margin-bottom: 6px; }
+  .t2-hint-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .t2-hint strong { color: #b06000; }
+  .t2-fact-list { margin: 4px 0 0 18px; font-size: 12px; }
+  .t2-fact-list li { margin-bottom: 2px; }
+  .t2-textarea {
+    width: 100%; min-height: 100px; padding: 8px 10px;
+    border: 1px solid #c8d0da; border-radius: 6px; font-size: 13px;
+    font-family: inherit; line-height: 1.5; resize: vertical;
+  }
+
+  .empty-hint { color: #999; font-style: italic; font-size: 13px; padding: 12px 0; }
+  .loading { text-align: center; padding: 60px; font-size: 18px; color: #888; }
+
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.85); align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  .lightbox.active { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <label>Shard:</label>
+  <input type="text" id="shardInput" placeholder="needs_review_shard_01.json">
+  <button id="btnLoad">Load</button>
+  <span class="progress" id="progressLabel">—</span>
+  <label style="margin-left:12px;"><input type="checkbox" id="autosaveToggle" checked> Autosave</label>
+  <label><input type="checkbox" id="latexToggle"> Render LaTeX</label>
+  <button id="btnSave" class="primary">Save</button>
+  <span class="status" id="statusLabel"></span>
+</div>
+
+<div class="nav-bar">
+  <button id="btnFirst">⟨⟨ First</button>
+  <button id="btnPrev">⟨ Prev</button>
+  <span class="page-info" id="pageInfo">—</span>
+  <button id="btnNext">Next ⟩</button>
+  <button id="btnLast">Last ⟩⟩</button>
+  <button id="btnNextUnfinished" style="margin-left:12px;">Next unfinished ⟩</button>
+  <div class="jump">
+    <input type="text" id="jumpInput" placeholder="Go to #">
+    <button id="btnJump">Go</button>
+  </div>
+</div>
+
+<div class="layout" id="layout">
+  <div class="loading" id="loadingMsg">Enter a shard filename and press Load.</div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+// ---------- state ----------
+let shardName = '';
+let problems = [];        // full array from the loaded shard
+let idx = 0;              // current problem index
+let saving = false;
+let saveTimer = null;
+
+// ---------- utils ----------
+function escapeHTML(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+}
+
+function renderImagePlaceholders(text, images) {
+  const escaped = escapeHTML(text);
+  return escaped.replace(/&lt;image_(\d+)&gt;/g, (match, num) => {
+    const i = parseInt(num) - 1;
+    if (images && images[i]) {
+      return `<span class="img-placeholder" onclick="openLightbox('${escapeHTML(images[i])}')">[Image ${num}]</span>`;
+    }
+    return `<span class="img-placeholder">[Image ${num}]</span>`;
+  });
+}
+
+function shortModel(name) {
+  if (!name) return '';
+  return name
+    .replace(/^us\./, '').replace(/^anthropic\./, '')
+    .replace(/-v1$/, '').replace(/-preview$/, '')
+    .replace('claude-', '').replace('gemini-', 'gem-').replace('gpt-', 'gpt-');
+}
+
+function nowIso() { return new Date().toISOString(); }
+
+function openLightbox(src) {
+  const lb = document.getElementById('lightbox');
+  document.getElementById('lightboxImg').src = src;
+  lb.classList.add('active');
+}
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('active');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+});
+
+// ---------- finished detection ----------
+function isT1Finished(q) {
+  const a = q.annotation;
+  if (!a || !a.verdict) return false;
+  if (a.verdict === 'drop') return true;
+  if (a.verdict === 'reasonable') return !!a.correct_option;
+  if (a.verdict === 'minor_fix') return !!a.correct_option && !!(a.fix_comment && a.fix_comment.trim());
+  return false;
+}
+function isT2Finished(q) {
+  const a = q.annotation;
+  if (!a || typeof a.prunable !== 'boolean') return false;
+  if (a.prunable === false) return true;
+  return !!(a.corrected_pruned_question && a.corrected_pruned_question.trim());
+}
+function isProblemFinished(p) {
+  const t1 = p.tier1_questions || [];
+  const t2 = p.tier2_questions || [];
+  return t1.every(isT1Finished) && t2.every(isT2Finished);
+}
+
+// ---------- load / save ----------
+function setStatus(text, kind = '') {
+  const el = document.getElementById('statusLabel');
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+async function loadShard(name) {
+  setStatus('loading…');
+  try {
+    const res = await fetch(name, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('shard is not a JSON array');
+    shardName = name;
+    problems = data;
+    idx = 0;
+    document.getElementById('loadingMsg')?.remove();
+    renderAll();
+    setStatus(`loaded ${problems.length} problems`, 'ok');
+    // jump to the first unfinished problem on fresh load
+    const firstUnfinished = problems.findIndex(p => !isProblemFinished(p));
+    if (firstUnfinished > 0) { idx = firstUnfinished; renderAll(); }
+  } catch (e) {
+    setStatus('load failed: ' + e.message, 'error');
+    document.getElementById('layout').innerHTML = `<div class="loading">Failed to load ${escapeHTML(name)}: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function saveCurrent() {
+  if (!problems.length || saving) return;
+  saving = true;
+  setStatus('saving…');
+  const p = problems[idx];
+  const t1_annotations = {};
+  (p.tier1_questions || []).forEach(q => {
+    if (q.annotation) t1_annotations[q.question_id] = q.annotation;
+  });
+  const t2_list = p.tier2_questions || [];
+  const t2_annotation = (t2_list[0] && t2_list[0].annotation) ? t2_list[0].annotation : null;
+
+  try {
+    const res = await fetch('/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        shard: shardName,
+        problem_id: p.id,
+        t1_annotations,
+        t2_annotation,
+      }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    setStatus('saved ' + new Date().toLocaleTimeString(), 'ok');
+    renderProgress();
+  } catch (e) {
+    setStatus('save failed: ' + e.message, 'error');
+  } finally {
+    saving = false;
+  }
+}
+
+function scheduleAutosave() {
+  if (!document.getElementById('autosaveToggle').checked) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveCurrent, 600);
+}
+
+// ---------- rendering ----------
+function renderProgress() {
+  const done = problems.filter(isProblemFinished).length;
+  document.getElementById('progressLabel').innerHTML =
+    `<span class="done">${done}</span> / ${problems.length} finished`;
+  document.getElementById('pageInfo').textContent =
+    problems.length ? `${idx + 1} / ${problems.length}` : '—';
+}
+
+function renderAll() {
+  if (!problems.length) return;
+  renderProgress();
+  const p = problems[idx];
+  document.getElementById('layout').innerHTML =
+    renderLeft(p) + renderRight(p);
+  // Wire events after render
+  bindAnnotationEvents(p);
+  maybeRenderLatex();
+}
+
+function maybeRenderLatex() {
+  const toggle = document.getElementById('latexToggle');
+  if (!toggle || !toggle.checked) return;
+  if (!window.__katexReady || !window.renderMathInElement) return;
+  const layout = document.getElementById('layout');
+  if (!layout) return;
+  try {
+    renderMathInElement(layout, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\[', right: '\\]', display: true },
+        { left: '\\(', right: '\\)', display: false },
+      ],
+      throwOnError: false,
+      errorColor: '#d93025',
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'input'],
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+function renderLeft(p) {
+  const badges = [];
+  if (p.dataset) badges.push(`<span class="badge dataset">${escapeHTML(p.dataset)}</span>`);
+  if (p.domain) badges.push(`<span class="badge domain">${escapeHTML(p.domain)}</span>`);
+  if (p.subdomain) badges.push(`<span class="badge subdomain">${escapeHTML(p.subdomain)}</span>`);
+  if (p.question_type) badges.push(`<span class="badge qtype">${escapeHTML(p.question_type)}</span>`);
+
+  const images = p.images || [];
+  const imgHtml = images.length
+    ? `<div class="images-row">${images.map((src, i) => `
+         <div class="img-container" id="leftImg_${i}">
+           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="image ${i+1}">
+           <div class="img-label">Image ${i+1}</div>
+         </div>`).join('')}</div>`
+    : '<div class="empty-hint">(no images)</div>';
+
+  const answer = Array.isArray(p.answer) ? p.answer.join(', ') : (p.answer ?? '');
+  const finishedChip = isProblemFinished(p)
+    ? '<span class="finished-chip done">✓ finished</span>'
+    : '<span class="finished-chip">in progress</span>';
+
+  const opts = p.options;
+  const hasOpts = opts && typeof opts === 'object' && !Array.isArray(opts) && Object.keys(opts).length > 0;
+  const optsHtml = hasOpts
+    ? `<div class="section-label">Options</div>
+       <div class="t1-options">
+         ${Object.keys(opts).sort().map(L => `
+           <div class="t1-option"><span class="t1-option-letter">${L}</span>
+             <span>${renderImagePlaceholders(opts[L] ?? '', images)}</span></div>`).join('')}
+       </div>`
+    : '';
+
+  return `
+  <div class="panel">
+    <div class="panel-header">
+      <span class="id">${escapeHTML(p.id || '')}</span>
+      ${badges.join(' ')}
+      ${finishedChip}
+    </div>
+    <div class="panel-body">
+      <div class="section-label">Question</div>
+      <div class="question-text">${renderImagePlaceholders(p.question || '', images)}</div>
+      <div class="section-label">Images</div>
+      ${imgHtml}
+      ${optsHtml}
+      <div class="section-label">Original answer</div>
+      <div class="t2-pruned">${escapeHTML(answer || '(none)')}</div>
+    </div>
+  </div>
+  `;
+}
+
+function renderRight(p) {
+  const t1 = p.tier1_questions || [];
+  const t2 = p.tier2_questions || [];
+  const cards = [];
+
+  t1.forEach((q, i) => cards.push(renderT1Card(p, q, i)));
+  t2.forEach((q) => cards.push(renderT2Card(p, q)));
+
+  if (!cards.length) {
+    cards.push('<div class="empty-hint">Nothing flagged for review.</div>');
+  }
+
+  return `
+  <div class="panel">
+    <div class="panel-header">
+      <span class="id">Needs review</span>
+      <span style="color:#666;font-size:12px;">
+        ${t1.length} tier1 · ${t2.length} tier2
+      </span>
+    </div>
+    <div class="panel-body">
+      <div class="review-cards">${cards.join('')}</div>
+    </div>
+  </div>
+  `;
+}
+
+function renderT1Card(p, q, i) {
+  const type = q.type || '?';
+  const typeClass = `t1-type-${type}`;
+  const imageIdx = q.image_index ?? 0;
+  const imgSrc = (p.images || [])[imageIdx];
+  const options = q.options || {};
+  const letters = Object.keys(options).sort();
+
+  const optionsHtml = letters.map(L => `
+    <div class="t1-option"><span class="t1-option-letter">${L}</span>
+      <span>${renderImagePlaceholders(options[L] ?? '', p.images)}</span></div>
+  `).join('');
+
+  // Votes
+  const gen = q.generator_answer;
+  const votes = (q.reference_answers && q.reference_answers.model_votes) || {};
+  const majority = {};
+  Object.values(votes).forEach(v => { majority[v] = (majority[v] || 0) + 1; });
+  const topVote = Object.entries(majority).sort((a,b)=>b[1]-a[1])[0]?.[0];
+  const voteMatch = v => v && topVote && v === topVote;
+  const votesHtml = `
+    <span class="label">votes:</span>
+    <span class="vote-pill gen">gen=${escapeHTML(gen ?? '?')}</span>
+    ${Object.entries(votes).map(([m, v]) => `
+      <span class="vote-pill ${voteMatch(v) ? 'match' : 'mismatch'}">${escapeHTML(shortModel(m))}=${escapeHTML(v)}</span>
+    `).join('')}
+  `;
+
+  const thumbHtml = imgSrc ? `
+    <div class="t1-thumb-row">
+      <div class="t1-thumb" onclick="openLightbox('${escapeHTML(imgSrc)}')">
+        <img src="${escapeHTML(imgSrc)}" alt="thumb">
+        <div class="thumb-label">Image ${imageIdx + 1}</div>
+      </div>
+    </div>` : '';
+
+  // Annotation controls
+  const ann = q.annotation || {};
+  const verdict = ann.verdict || '';
+  const chosen = ann.correct_option || '';
+  const comment = ann.fix_comment || '';
+
+  const optionPills = letters.map(L => `
+    <label class="opt-pill ${chosen === L ? 'checked' : ''}">
+      <input type="radio" name="t1opt_${i}" value="${L}" ${chosen === L ? 'checked' : ''}>
+      ${L}
+    </label>`).join('');
+
+  const showOpt = verdict === 'reasonable' || verdict === 'minor_fix';
+  const showComment = verdict === 'minor_fix';
+  const finished = isT1Finished(q);
+
+  return `
+  <div class="card ${finished ? 'done' : ''}" data-t1-idx="${i}">
+    <div class="card-head">
+      <span class="t1-type-badge ${typeClass}">${escapeHTML(type)} · ${escapeHTML(q.type_name || '')}</span>
+      <span class="t1-img-chip" data-img-focus="${imageIdx}">Image ${imageIdx + 1}</span>
+      <span class="t1-qid">${escapeHTML(q.question_id || '')}</span>
+      ${finished ? '<span class="finished-chip done" style="margin-left:auto;">✓</span>' : ''}
+    </div>
+    <div class="card-body">
+      <div class="t1-question">${renderImagePlaceholders(q.question || '', p.images)}</div>
+      <div class="t1-options">${optionsHtml}</div>
+      <div class="vote-row">${votesHtml}</div>
+      ${thumbHtml}
+      <div class="annot-box">
+        <div class="annot-row">
+          <label class="label-reasonable">
+            <input type="radio" name="t1v_${i}" value="reasonable" ${verdict === 'reasonable' ? 'checked' : ''}>
+            <span>Reasonable</span>
+          </label>
+          <label class="label-minor_fix">
+            <input type="radio" name="t1v_${i}" value="minor_fix" ${verdict === 'minor_fix' ? 'checked' : ''}>
+            <span>Minor fix</span>
+          </label>
+          <label class="label-drop">
+            <input type="radio" name="t1v_${i}" value="drop" ${verdict === 'drop' ? 'checked' : ''}>
+            <span>Drop</span>
+          </label>
+        </div>
+        <div class="annot-row" style="${showComment ? '' : 'display:none;'}" data-row="comment_${i}">
+          <label style="min-width:70px;">Comment:</label>
+          <input type="text" class="comment-input" data-comment="${i}" value="${escapeHTML(comment)}"
+                 placeholder="One-line description of how to fix the question/options">
+        </div>
+        <div class="annot-row" style="${showOpt ? '' : 'display:none;'}" data-row="opt_${i}">
+          <label style="min-width:70px;">Correct option:</label>
+          <div class="opt-row" data-opts="${i}">${optionPills}</div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderT2Card(p, q) {
+  const ann = q.annotation || {};
+  const prunable = ann.prunable;
+  const corrected = ann.corrected_pruned_question ?? q.pruned_question ?? '';
+  const finished = isT2Finished(q);
+
+  const showExpl = q.binary_label === 0 && q.explanation;
+  const missingFacts = (q.stage4_labels || [])
+    .filter(x => x && (x.label === 'None' || x.label === 'none'));
+
+  const hintBlocks = [];
+  if (q.masked_question) {
+    hintBlocks.push(`
+      <details class="t2-collapsible">
+        <summary>Masked question</summary>
+        <div class="t2-hint-body">${escapeHTML(q.masked_question)}</div>
+      </details>`);
+  }
+  if (q.recovered_question) {
+    hintBlocks.push(`
+      <details class="t2-collapsible">
+        <summary>Recovered question</summary>
+        <div class="t2-hint-body">${escapeHTML(q.recovered_question)}</div>
+      </details>`);
+  }
+  if (showExpl) {
+    hintBlocks.push(`
+      <div class="t2-hint">
+        <strong>Stage-3 explanation (binary_label=0):</strong><br>
+        ${escapeHTML(q.explanation)}
+      </div>`);
+  }
+  if (missingFacts.length) {
+    hintBlocks.push(`
+      <div class="t2-hint">
+        <strong>Facts flagged as missing from pruned version:</strong>
+        <ul class="t2-fact-list">
+          ${missingFacts.map(f => `<li>${escapeHTML(f.fact)}</li>`).join('')}
+        </ul>
+      </div>`);
+  }
+
+  const yesChecked = prunable === true ? 'checked' : '';
+  const noChecked = prunable === false ? 'checked' : '';
+  const showTextarea = prunable === true;
+
+  return `
+  <div class="card t2-card ${finished ? 'done' : ''}">
+    <div class="card-head">
+      <span class="t1-type-badge t1-tier-badge">TIER 2</span>
+      <span class="t1-qid">${escapeHTML(q.question_id || '')}</span>
+      <span style="font-size:12px; color:#666;">binary_label=${q.binary_label}</span>
+      ${finished ? '<span class="finished-chip done" style="margin-left:auto;">✓</span>' : ''}
+    </div>
+    <div class="card-body">
+      <div class="t2-label">Pruned question (current)</div>
+      <div class="t2-pruned">${escapeHTML(q.pruned_question ?? '(empty)')}</div>
+
+      ${hintBlocks.join('')}
+
+      <div class="annot-box">
+        <div class="annot-row">
+          <label style="min-width:230px;">Is this problem truly prunable?</label>
+          <label><input type="radio" name="t2p" value="yes" ${yesChecked}> <span>Yes</span></label>
+          <label><input type="radio" name="t2p" value="no" ${noChecked}> <span>No</span></label>
+        </div>
+        <div style="${showTextarea ? '' : 'display:none;'}" data-row="t2text">
+          <div class="t2-label" style="margin-top:6px;">Corrected pruned question</div>
+          <textarea class="t2-textarea" id="t2Textarea">${escapeHTML(corrected)}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---------- event wiring ----------
+function bindAnnotationEvents(p) {
+  // tier1 verdict radios
+  (p.tier1_questions || []).forEach((q, i) => {
+    document.querySelectorAll(`input[name="t1v_${i}"]`).forEach(el => {
+      el.addEventListener('change', () => {
+        const verdict = el.value;
+        q.annotation = q.annotation || {};
+        q.annotation.verdict = verdict;
+        q.annotation.annotated_at = nowIso();
+        if (verdict === 'drop') {
+          q.annotation.correct_option = null;
+          q.annotation.fix_comment = null;
+        } else if (verdict === 'reasonable') {
+          q.annotation.fix_comment = null;
+        }
+        refreshT1Rows(i, verdict);
+        refreshCardDone(i);
+        renderProgress();
+        scheduleAutosave();
+      });
+    });
+    // tier1 option pills
+    document.querySelectorAll(`input[name="t1opt_${i}"]`).forEach(el => {
+      el.addEventListener('change', () => {
+        q.annotation = q.annotation || {};
+        q.annotation.correct_option = el.value;
+        q.annotation.annotated_at = nowIso();
+        // Update checked class
+        document.querySelectorAll(`[data-opts="${i}"] .opt-pill`).forEach(p => {
+          p.classList.toggle('checked', p.querySelector('input').checked);
+        });
+        refreshCardDone(i);
+        renderProgress();
+        scheduleAutosave();
+      });
+    });
+    // tier1 comment
+    const commentEl = document.querySelector(`input[data-comment="${i}"]`);
+    if (commentEl) {
+      commentEl.addEventListener('input', () => {
+        q.annotation = q.annotation || {};
+        q.annotation.fix_comment = commentEl.value;
+        q.annotation.annotated_at = nowIso();
+        refreshCardDone(i);
+        renderProgress();
+        scheduleAutosave();
+      });
+    }
+    // image chip → focus left image
+    document.querySelectorAll(`[data-t1-idx="${i}"] [data-img-focus]`).forEach(el => {
+      el.addEventListener('click', () => {
+        const target = document.getElementById('leftImg_' + el.dataset.imgFocus);
+        if (target) {
+          target.classList.add('focus');
+          target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          setTimeout(() => target.classList.remove('focus'), 1500);
+        }
+      });
+    });
+  });
+
+  // tier2 controls
+  const t2 = (p.tier2_questions || [])[0];
+  if (t2) {
+    document.querySelectorAll('input[name="t2p"]').forEach(el => {
+      el.addEventListener('change', () => {
+        t2.annotation = t2.annotation || {};
+        t2.annotation.prunable = (el.value === 'yes');
+        t2.annotation.annotated_at = nowIso();
+        if (t2.annotation.prunable === false) {
+          t2.annotation.corrected_pruned_question = null;
+          const tr = document.querySelector('[data-row="t2text"]');
+          if (tr) tr.style.display = 'none';
+        } else {
+          const tr = document.querySelector('[data-row="t2text"]');
+          if (tr) tr.style.display = '';
+          const ta = document.getElementById('t2Textarea');
+          if (ta && !t2.annotation.corrected_pruned_question) {
+            t2.annotation.corrected_pruned_question = ta.value || t2.pruned_question || '';
+          }
+        }
+        refreshT2CardDone();
+        renderProgress();
+        scheduleAutosave();
+      });
+    });
+    const ta = document.getElementById('t2Textarea');
+    if (ta) {
+      ta.addEventListener('input', () => {
+        t2.annotation = t2.annotation || {};
+        t2.annotation.corrected_pruned_question = ta.value;
+        t2.annotation.annotated_at = nowIso();
+        refreshT2CardDone();
+        renderProgress();
+        scheduleAutosave();
+      });
+    }
+  }
+}
+
+function refreshT1Rows(i, verdict) {
+  const commentRow = document.querySelector(`[data-row="comment_${i}"]`);
+  const optRow = document.querySelector(`[data-row="opt_${i}"]`);
+  if (commentRow) commentRow.style.display = verdict === 'minor_fix' ? '' : 'none';
+  if (optRow) optRow.style.display = (verdict === 'reasonable' || verdict === 'minor_fix') ? '' : 'none';
+}
+function refreshCardDone(i) {
+  const p = problems[idx];
+  const q = (p.tier1_questions || [])[i];
+  if (!q) return;
+  const card = document.querySelector(`[data-t1-idx="${i}"]`);
+  if (card) card.classList.toggle('done', isT1Finished(q));
+}
+function refreshT2CardDone() {
+  const p = problems[idx];
+  const q = (p.tier2_questions || [])[0];
+  if (!q) return;
+  const card = document.querySelector('.t2-card');
+  if (card) card.classList.toggle('done', isT2Finished(q));
+}
+
+// ---------- navigation ----------
+function goto(i) {
+  if (!problems.length) return;
+  idx = Math.max(0, Math.min(problems.length - 1, i));
+  renderAll();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.getElementById('btnFirst').addEventListener('click', () => goto(0));
+document.getElementById('btnPrev').addEventListener('click', () => goto(idx - 1));
+document.getElementById('btnNext').addEventListener('click', () => goto(idx + 1));
+document.getElementById('btnLast').addEventListener('click', () => goto(problems.length - 1));
+document.getElementById('btnNextUnfinished').addEventListener('click', () => {
+  const start = idx + 1;
+  for (let i = 0; i < problems.length; i++) {
+    const j = (start + i) % problems.length;
+    if (!isProblemFinished(problems[j])) { goto(j); return; }
+  }
+  setStatus('all finished!', 'ok');
+});
+document.getElementById('btnJump').addEventListener('click', () => {
+  const v = parseInt(document.getElementById('jumpInput').value, 10);
+  if (!isNaN(v)) goto(v - 1);
+});
+document.getElementById('jumpInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnJump').click();
+});
+
+// ---------- save button ----------
+document.getElementById('btnSave').addEventListener('click', saveCurrent);
+
+// ---------- shard loading ----------
+document.getElementById('btnLoad').addEventListener('click', () => {
+  const name = document.getElementById('shardInput').value.trim();
+  if (name) loadShard(name);
+});
+
+// ---------- LaTeX toggle ----------
+const latexToggleEl = document.getElementById('latexToggle');
+latexToggleEl.checked = localStorage.getItem('latexOn') === '1';
+latexToggleEl.addEventListener('change', () => {
+  localStorage.setItem('latexOn', latexToggleEl.checked ? '1' : '0');
+  if (problems.length) renderAll();
+});
+
+// ---------- init ----------
+const params = new URLSearchParams(window.location.search);
+const initialShard = params.get('shard') || '';
+document.getElementById('shardInput').value = initialShard;
+if (initialShard) loadShard(initialShard);
+</script>
+</body>
+</html>
