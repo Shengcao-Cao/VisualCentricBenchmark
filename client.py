@@ -148,6 +148,61 @@ class VLMClient(ABC):
         }
 
 
+class OpenRouterClient(VLMClient):
+    """OpenRouter Chat Completions API client (OpenAI-compatible)."""
+
+    def __init__(
+        self,
+        model_name: str = "qwen/qwen3.5-397b-a17b",
+        api_key: str | None = None,
+        max_retries: int = 5,
+        thinking_effort: str = "none",
+        max_tokens: int = 64000,
+    ):
+        super().__init__(
+            model_name,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
+        key = api_key or os.environ["OPENROUTER_API_KEY"]
+        self.client = AsyncOpenAI(
+            api_key=key,
+            base_url="https://openrouter.ai/api/v1",
+        )
+
+    async def _call(
+        self, messages: list[dict], max_tokens: int, temperature: float
+    ) -> str:
+        reasoning_enabled = self.thinking_effort != "none"
+        kwargs = dict(
+            model=self.model_name,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=temperature,
+        )
+        if reasoning_enabled:
+            kwargs["extra_body"] = {"reasoning": {"enabled": True}}
+
+        response = await self.client.chat.completions.create(**kwargs)
+        msg = response.choices[0].message
+        parts = []
+        reasoning = getattr(msg, "reasoning_content", None) or getattr(msg, "reasoning", None)
+        if reasoning_enabled and reasoning:
+            if isinstance(reasoning, list):
+                parts.extend(r.get("content", "") for r in reasoning if isinstance(r, dict))
+            else:
+                parts.append(str(reasoning))
+        if msg.content:
+            parts.append(msg.content)
+        if not parts:
+            raise RuntimeError(
+                f"OpenRouter response contained no content "
+                f"(finish_reason={response.choices[0].finish_reason})."
+            )
+        return "\n\n".join(parts)
+
+
 class OpenAIClient(VLMClient):
     """OpenAI Responses API client with vision support."""
 
@@ -328,6 +383,218 @@ class ClaudeClient(VLMClient):
                             "media_type": media_type,
                             "data": b64_data,
                         },
+                    })
+        return {"role": msg["role"], "content": parts}
+
+
+class BedrockConverseClient(VLMClient):
+    """Base client for Bedrock models using the Converse API.
+
+    Subclasses only need to set default model_name and max_tokens.
+    """
+
+    MAX_IMAGE_BYTES = 3_900_000
+
+    def __init__(
+        self,
+        model_name: str,
+        api_key: str | None = None,
+        region: str = "us-east-1",
+        max_retries: int = 5,
+        thinking_effort: str = "low",
+        max_tokens: int = 64000,
+    ):
+        super().__init__(
+            model_name,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
+        token = api_key or os.environ["AWS_BEARER_TOKEN_BEDROCK"]
+        session = boto3.Session()
+        self.client = session.client(
+            "bedrock-runtime",
+            region_name=region,
+            config=botocore.config.Config(read_timeout=3600),
+            aws_access_key_id="bedrock",
+            aws_secret_access_key="bedrock",
+            aws_session_token=token,
+        )
+
+    async def _call(
+        self, messages: list[dict], max_tokens: int, temperature: float
+    ) -> str:
+        system_parts = []
+        api_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                text = msg["content"] if isinstance(msg["content"], str) else str(msg["content"])
+                system_parts.append({"text": text})
+            else:
+                api_messages.append(self._convert_message(msg))
+
+        kwargs = {
+            "modelId": self.model_name,
+            "messages": api_messages,
+            "inferenceConfig": {"maxTokens": max_tokens, "temperature": temperature},
+        }
+        if system_parts:
+            kwargs["system"] = system_parts
+
+        response = await asyncio.to_thread(self.client.converse, **kwargs)
+        content_blocks = response["output"]["message"]["content"]
+        texts = [b["text"] for b in content_blocks if "text" in b]
+        if not texts:
+            stop = response.get("stopReason", "unknown")
+            raise RuntimeError(
+                f"Bedrock Converse response contained no text "
+                f"(stopReason={stop}). Try increasing max_tokens."
+            )
+        return "\n\n".join(texts)
+
+    @staticmethod
+    def _convert_message(msg: dict) -> dict:
+        """Convert OpenAI-style message to Bedrock Converse format."""
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return {"role": msg["role"], "content": [{"text": content}]}
+        parts = []
+        for part in content:
+            if part["type"] == "text":
+                parts.append({"text": part["text"]})
+            elif part["type"] == "image_url":
+                url = part["image_url"]["url"]
+                if url.startswith("data:"):
+                    header, b64_data = url.split(",", 1)
+                    media_type = header.split(":")[1].split(";")[0]
+                    fmt = media_type.split("/")[1]
+                    parts.append({
+                        "image": {
+                            "format": fmt,
+                            "source": {"bytes": base64.b64decode(b64_data)},
+                        }
+                    })
+        return {"role": msg["role"], "content": parts}
+
+
+class QwenClient(BedrockConverseClient):
+    """Qwen3 VL via AWS Bedrock Converse API."""
+
+    MAX_IMAGE_BYTES = 1_500_000
+
+    def __init__(
+        self,
+        model_name: str = "qwen.qwen3-vl-235b-a22b",
+        api_key: str | None = None,
+        region: str = "us-east-1",
+        max_retries: int = 5,
+        thinking_effort: str = "none",
+        max_tokens: int = 8000,
+    ):
+        super().__init__(
+            model_name,
+            api_key=api_key,
+            region=region,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
+
+
+class KimiClient(BedrockConverseClient):
+    """Kimi K2.5 (Moonshot AI) via AWS Bedrock Converse API."""
+
+    MAX_IMAGE_BYTES = 1_500_000
+
+    def __init__(
+        self,
+        model_name: str = "moonshotai.kimi-k2.5",
+        api_key: str | None = None,
+        region: str = "us-east-1",
+        max_retries: int = 5,
+        thinking_effort: str = "none",
+        max_tokens: int = 16000,
+    ):
+        super().__init__(
+            model_name,
+            api_key=api_key,
+            region=region,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
+
+
+class NovaClient(BedrockConverseClient):
+    """Amazon Nova 2 Lite via AWS Bedrock Converse API."""
+
+    MAX_ASPECT_RATIO = 18.0
+
+    def __init__(
+        self,
+        model_name: str = "us.amazon.nova-2-lite-v1:0",
+        api_key: str | None = None,
+        region: str = "us-east-1",
+        max_retries: int = 5,
+        thinking_effort: str = "none",
+        max_tokens: int = 64000,
+    ):
+        super().__init__(
+            model_name,
+            api_key=api_key,
+            region=region,
+            max_retries=max_retries,
+            thinking_effort=thinking_effort,
+            max_tokens=max_tokens,
+        )
+
+    @staticmethod
+    def _clamp_aspect_ratio(image_bytes: bytes, max_ratio: float = 20.0) -> bytes:
+        """Pad image with black bars if aspect ratio exceeds max_ratio."""
+        img = Image.open(io.BytesIO(image_bytes))
+        w, h = img.size
+        ratio = max(w, h) / max(min(w, h), 1)
+        if ratio <= max_ratio:
+            return image_bytes
+        if w > h:
+            new_h = max(int(w / max_ratio), 1)
+            padded = Image.new(img.mode, (w, new_h), 0)
+            padded.paste(img, (0, (new_h - h) // 2))
+        else:
+            new_w = max(int(h / max_ratio), 1)
+            padded = Image.new(img.mode, (new_w, h), 0)
+            padded.paste(img, ((new_w - w) // 2, 0))
+        fmt = img.format or ("PNG" if VLMClient._detect_mime(image_bytes) == "image/png" else "JPEG")
+        if fmt in ("JPEG", "WEBP") and padded.mode in ("RGBA", "P"):
+            padded = padded.convert("RGB")
+        buf = io.BytesIO()
+        padded.save(buf, format=fmt)
+        logger.info("Padded image from %dx%d (ratio %.1f) to %dx%d", w, h, ratio, padded.size[0], padded.size[1])
+        return buf.getvalue()
+
+    @staticmethod
+    def _convert_message(msg: dict) -> dict:
+        """Convert OpenAI-style message to Bedrock Converse format with aspect ratio clamping."""
+        content = msg.get("content", "")
+        if isinstance(content, str):
+            return {"role": msg["role"], "content": [{"text": content}]}
+        parts = []
+        for part in content:
+            if part["type"] == "text":
+                parts.append({"text": part["text"]})
+            elif part["type"] == "image_url":
+                url = part["image_url"]["url"]
+                if url.startswith("data:"):
+                    header, b64_data = url.split(",", 1)
+                    media_type = header.split(":")[1].split(";")[0]
+                    fmt = media_type.split("/")[1]
+                    raw = base64.b64decode(b64_data)
+                    raw = NovaClient._clamp_aspect_ratio(raw, NovaClient.MAX_ASPECT_RATIO)
+                    parts.append({
+                        "image": {
+                            "format": fmt,
+                            "source": {"bytes": raw},
+                        }
                     })
         return {"role": msg["role"], "content": parts}
 

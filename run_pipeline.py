@@ -15,7 +15,7 @@ import argparse
 import asyncio
 from pathlib import Path
 
-from client import ClaudeClient, GeminiClient, OpenAIClient
+from client import ClaudeClient, GeminiClient, KimiClient, NovaClient, OpenAIClient, OpenRouterClient, QwenClient
 from tasks.answer import run_answer
 from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
@@ -75,6 +75,11 @@ def parse_args() -> argparse.Namespace:
         default=64000,
         help="Max output tokens per request (default: 64000)",
     )
+    parser.add_argument(
+        "--open-router",
+        action="store_true",
+        help="Use OpenRouter API (requires OPENROUTER_API_KEY)",
+    )
     return parser.parse_args()
 
 
@@ -105,8 +110,14 @@ async def main() -> None:
 
     base_dir = Path(args.base_dir) if args.base_dir else Path(args.input).parent
 
-    # if args.model_name.startswith("gemini"):
-    if "gemini" in args.model_name.lower():
+    if args.open_router:
+        client = OpenRouterClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
+    elif "gemini" in args.model_name.lower() or "gemma" in args.model_name.lower():
         client = GeminiClient(
             model_name=args.model_name,
             api_key=args.api_key,
@@ -115,6 +126,30 @@ async def main() -> None:
         )
     elif "claude" in args.model_name.lower():
         client = ClaudeClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            region=args.region,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
+    elif "qwen" in args.model_name.lower():
+        client = QwenClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            region=args.region,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
+    elif "kimi" in args.model_name.lower():
+        client = KimiClient(
+            model_name=args.model_name,
+            api_key=args.api_key,
+            region=args.region,
+            thinking_effort=args.thinking_effort,
+            max_tokens=args.max_tokens,
+        )
+    elif "nova" in args.model_name.lower():
+        client = NovaClient(
             model_name=args.model_name,
             api_key=args.api_key,
             region=args.region,

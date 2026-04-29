@@ -96,9 +96,14 @@ async def run_batch(
 
     async def wrapper(idx: int, item: dict) -> None:
         nonlocal completed
-        async with semaphore:
-            result = await process_fn(item)
-        results[idx] = result
+        try:
+            async with semaphore:
+                result = await process_fn(item)
+            results[idx] = result
+        except Exception as e:
+            item_id = item.get("id", idx) if isinstance(item, dict) else idx
+            print(f"  [ERROR] Item {item_id} failed after retries: {type(e).__name__}: {str(e)[:300]}")
+            results[idx] = item
         async with lock:
             completed += 1
             if save_interval > 0 and output_path and completed % save_interval == 0:
