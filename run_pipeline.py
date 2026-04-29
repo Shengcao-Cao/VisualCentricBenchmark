@@ -19,6 +19,7 @@ from client import ClaudeClient, GeminiClient, KimiClient, NovaClient, OpenAICli
 from tasks.answer import run_answer
 from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
+from tasks.better_judge import run_better_judge
 from tasks.judge import run_judge
 from tasks.perception import run_perception
 from tasks.prune import run_prune
@@ -32,7 +33,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "judge", "caption", "difficulty", "perception", "prune", "all", "structured",
+        choices=["answer", "judge", "better_judge", "caption", "difficulty", "perception", "prune", "all", "structured",
                  "generate_tier1", "reference_answer_tier1"],
         help="Task to run",
     )
@@ -79,6 +80,16 @@ def parse_args() -> argparse.Namespace:
         "--open-router",
         action="store_true",
         help="Use OpenRouter API (requires OPENROUTER_API_KEY)",
+    )
+    parser.add_argument(
+        "--judge-model",
+        default="gemini-3.1-flash-lite-preview",
+        help="Model to use as judge for better_judge task (default: gemini-3.1-flash-lite-preview)",
+    )
+    parser.add_argument(
+        "--judge-api-key",
+        default=None,
+        help="API key for the judge model (defaults to --api-key if not set)",
     )
     return parser.parse_args()
 
@@ -209,6 +220,28 @@ async def main() -> None:
     elif args.task == "judge":
         data = await run_judge(data, client, model_key, base_dir, args.concurrency,
                                skip_fn=make_skip_fn(["judge"]), **common)
+    elif args.task == "better_judge":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+        data = await run_better_judge(data, judge_client, model_key, base_dir, args.concurrency,
+                                      skip_fn=make_skip_fn(["judge"]), **common)
     elif args.task == "caption":
         data = await run_caption(data, client, model_key, base_dir, args.concurrency,
                                  skip_fn=make_skip_fn(["captions"]), **common)
