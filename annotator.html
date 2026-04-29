@@ -219,6 +219,10 @@
   .t2-collapsible summary { cursor: pointer; font-weight: 700; color: #4a6fb5; user-select: none; }
   .t2-collapsible[open] summary { margin-bottom: 6px; }
   .t2-hint-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+  .diff-eq  { color: inherit; }
+  .diff-del { background: #fce8e6; color: #c5221f; text-decoration: line-through; padding: 0 2px; border-radius: 2px; }
+  .diff-ins { background: #e6f4ea; color: #137333; padding: 0 2px; border-radius: 2px; }
+  .t2-diff-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; margin-top: 4px; }
   .t2-hint strong { color: #b06000; }
   .t2-fact-list { margin: 4px 0 0 18px; font-size: 12px; }
   .t2-fact-list li { margin-bottom: 2px; }
@@ -308,6 +312,53 @@ function shortModel(name) {
 }
 
 function nowIso() { return new Date().toISOString(); }
+
+// ---------- word-level diff (LCS) ----------
+function tokenizeForDiff(s) {
+  // Per-token rules:
+  //   - a single CJK ideograph (incl. Ext-A and Compatibility) -> char-level diff
+  //   - a single Japanese kana                                  -> char-level diff
+  //   - an ASCII word run (letters/digits/underscore)           -> word-level diff
+  //   - a whitespace run                                        -> 1 token
+  //   - any other single code point (punctuation, $, /, etc.)   -> 1 token
+  // The `u` flag makes `.` match a single code point (incl. surrogate pairs).
+  return (s || '').match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u30ff]|[A-Za-z0-9_]+|\s+|./gu) || [];
+}
+function wordDiff(a, b) {
+  const A = tokenizeForDiff(a), B = tokenizeForDiff(b);
+  const m = A.length, n = B.length;
+  // LCS length DP (1D rows would be enough, but n*m here is tiny)
+  const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1
+                               : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    if (A[i] === B[j])           { ops.push(['eq',  A[i++]]); j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push(['del', A[i++]]);
+    else                                    ops.push(['ins', B[j++]]);
+  }
+  while (i < m) ops.push(['del', A[i++]]);
+  while (j < n) ops.push(['ins', B[j++]]);
+  return ops;
+}
+function renderWordDiff(orig, pruned) {
+  if (!orig && !pruned) return '<em style="color:#999;">(empty)</em>';
+  const ops = wordDiff(orig || '', pruned || '');
+  if (!ops.some(o => o[0] !== 'eq')) {
+    return '<em style="color:#888;">(no changes — pruned text is identical to original)</em>';
+  }
+  return ops.map(([t, w]) => {
+    const html = escapeHTML(w);
+    if (t === 'eq')  return `<span class="diff-eq">${html}</span>`;
+    if (t === 'del') return `<span class="diff-del">${html}</span>`;
+    return `<span class="diff-ins">${html}</span>`;
+  }).join('');
+}
 
 function openLightbox(src) {
   const lb = document.getElementById('lightbox');
@@ -649,6 +700,13 @@ function renderT2Card(p, q) {
         <summary>Recovered question</summary>
         <div class="t2-hint-body">${escapeHTML(q.recovered_question)}</div>
       </details>`);
+  }
+  if (q.pruned_question != null && p.question != null) {
+    hintBlocks.push(`
+      <div class="t2-hint">
+        <strong>Word diff (original → pruned):</strong>
+        <div class="t2-diff-body">${renderWordDiff(p.question, q.pruned_question)}</div>
+      </div>`);
   }
   if (showExpl) {
     hintBlocks.push(`
