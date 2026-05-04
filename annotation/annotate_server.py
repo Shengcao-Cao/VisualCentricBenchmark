@@ -1,14 +1,14 @@
-"""Minimal stdlib HTTP server for the tier3 annotation UI.
+"""Minimal stdlib HTTP server for the annotation UI.
 
-Serves static files (the annotator page, data JSONs, images from all_figures/
-and tier3_figures_jpg/) and accepts POST /save requests that patch annotation
-blocks into the data file.
+Serves static files (the annotator page, shard JSONs, images from all_figures/)
+and accepts POST /save requests that patch annotation blocks into a named
+shard file.
 
 Run:
-    python annotate_tier3_server.py --port 8001
+    python annotate_server.py --port 8000
 
 Open:
-    http://localhost:8001/annotator_tier3.html?file=filtered_data_with_solution_hard_tier3_jpg_pruned_fixed.json
+    http://localhost:8000/annotator.html?shard=data/needs_review_shard_01.json
 """
 
 import argparse
@@ -21,7 +21,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 
-_FILE_RE = re.compile(r"^[A-Za-z0-9_.-]+\.json$")
+_SHARD_RE = re.compile(r"^needs_review_shard_[A-Za-z0-9_-]+\.json$")
 _WRITE_LOCK = threading.Lock()
 _ROOT: Path  # set in main()
 
@@ -35,15 +35,15 @@ def _json_response(handler: "AnnotateHandler", status: int, payload: dict) -> No
     handler.wfile.write(body)
 
 
-def _safe_file_path(file_name: str) -> Path:
-    """Validate filename and return a path that stays inside _ROOT."""
-    if not _FILE_RE.match(file_name or ""):
-        raise ValueError(f"invalid file name: {file_name!r}")
-    path = (_ROOT / file_name).resolve()
-    if _ROOT.resolve() not in path.parents and path != _ROOT.resolve() / file_name:
-        raise ValueError(f"file path escapes root: {path}")
+def _safe_shard_path(shard_name: str) -> Path:
+    """Validate shard filename and return a path that stays inside _ROOT."""
+    if not _SHARD_RE.match(shard_name or ""):
+        raise ValueError(f"invalid shard name: {shard_name!r}")
+    path = (_ROOT / shard_name).resolve()
+    if _ROOT.resolve() not in path.parents and path != _ROOT.resolve() / shard_name:
+        raise ValueError(f"shard path escapes root: {path}")
     if not path.is_file():
-        raise FileNotFoundError(f"file not found: {file_name}")
+        raise FileNotFoundError(f"shard not found: {shard_name}")
     return path
 
 
@@ -54,19 +54,30 @@ def _atomic_write_json(path: Path, data) -> None:
     os.replace(tmp, path)
 
 
-def _apply_annotation(problem: dict, annotation: dict) -> None:
-    """Patch annotation into tier3_pruned_questions[0]."""
-    tp_list = problem.get("tier3_pruned_questions") or []
-    if tp_list and isinstance(annotation, dict):
-        tp_list[0]["annotation"] = annotation
+def _apply_annotations(
+    problem: dict, t1_annotations: dict, t2_annotation
+) -> None:
+    """Patch annotation fields into a problem in place."""
+    t1_by_id = {
+        q.get("question_id"): q for q in (problem.get("tier1_questions") or [])
+    }
+    for qid, ann in (t1_annotations or {}).items():
+        target = t1_by_id.get(qid)
+        if target is not None and isinstance(ann, dict):
+            target["annotation"] = ann
+
+    t2_list = problem.get("tier2_questions") or []
+    if t2_list and isinstance(t2_annotation, dict):
+        t2_list[0]["annotation"] = t2_annotation
 
 
 class AnnotateHandler(SimpleHTTPRequestHandler):
-    def log_message(self, fmt, *args):
+    # Silence the default stderr logger for static hits; keep it for POST.
+    def log_message(self, fmt, *args):  # noqa: D401, N802
         if self.command == "POST":
             super().log_message(fmt, *args)
 
-    def do_POST(self):
+    def do_POST(self):  # noqa: N802
         if self.path != "/save":
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "unknown endpoint"})
             return
@@ -81,36 +92,37 @@ class AnnotateHandler(SimpleHTTPRequestHandler):
             )
             return
 
-        file_name = payload.get("file")
+        shard = payload.get("shard")
         problem_id = payload.get("problem_id")
-        annotation = payload.get("annotation")
+        t1_annotations = payload.get("t1_annotations") or {}
+        t2_annotation = payload.get("t2_annotation")
 
-        if not file_name or not problem_id:
+        if not shard or not problem_id:
             _json_response(
                 self,
                 HTTPStatus.BAD_REQUEST,
-                {"error": "file and problem_id are required"},
+                {"error": "shard and problem_id are required"},
             )
             return
 
         try:
-            file_path = _safe_file_path(file_name)
+            shard_path = _safe_shard_path(shard)
         except (ValueError, FileNotFoundError) as e:
             _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(e)})
             return
 
         with _WRITE_LOCK:
-            data = json.loads(file_path.read_text(encoding="utf-8"))
+            data = json.loads(shard_path.read_text(encoding="utf-8"))
             problem = next((p for p in data if p.get("id") == problem_id), None)
             if problem is None:
                 _json_response(
                     self,
                     HTTPStatus.NOT_FOUND,
-                    {"error": f"problem_id {problem_id!r} not in {file_name}"},
+                    {"error": f"problem_id {problem_id!r} not in {shard}"},
                 )
                 return
-            _apply_annotation(problem, annotation)
-            _atomic_write_json(file_path, data)
+            _apply_annotations(problem, t1_annotations, t2_annotation)
+            _atomic_write_json(shard_path, data)
 
         _json_response(self, HTTPStatus.OK, {"ok": True, "problem": problem})
 
@@ -121,12 +133,12 @@ class AnnotateHandler(SimpleHTTPRequestHandler):
 
 def main() -> None:
     global _ROOT
-    parser = argparse.ArgumentParser(description="Tier3 annotation HTTP server")
-    parser.add_argument("--port", type=int, default=8001)
+    parser = argparse.ArgumentParser(description="Annotation HTTP server")
+    parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
         "--root",
-        default=str(Path(__file__).resolve().parent),
-        help="Directory to serve files from (default: this script's directory)",
+        default=str(Path(__file__).resolve().parent.parent),
+        help="Directory to serve files from (default: coreset root)",
     )
     args = parser.parse_args()
 
@@ -134,12 +146,12 @@ def main() -> None:
     if not _ROOT.is_dir():
         raise SystemExit(f"--root is not a directory: {_ROOT}")
 
-    os.chdir(_ROOT)
+    os.chdir(_ROOT)  # SimpleHTTPRequestHandler resolves from cwd
     server = ThreadingHTTPServer(("0.0.0.0", args.port), AnnotateHandler)
     print(f"Serving {_ROOT} on http://localhost:{args.port}")
     print(
-        f"  open http://localhost:{args.port}/annotator_tier3.html"
-        f"?file=filtered_data_with_solution_hard_tier3_jpg_pruned_fixed.json"
+        f"  open http://localhost:{args.port}/annotation/annotator.html"
+        f"?shard=data/needs_review_shard_01.json"
     )
     try:
         server.serve_forever()

@@ -1,5 +1,5 @@
-INPUT=filtered_data_with_solution_hard_tier3_fixed_jpg.json
-PREFIX=filtered_data_with_solution_hard_tier3_jpg
+INPUT=data/filtered_data_with_solution_hard_tier3_fixed_jpg.json
+PREFIX=data/filtered_data_with_solution_hard_tier3_jpg
 
 python run_pipeline.py answer_tier3 \
     -i $INPUT -o ${PREFIX}_gpt_5_4.json \

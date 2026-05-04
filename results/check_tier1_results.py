@@ -5,7 +5,7 @@ import glob
 import os
 from collections import Counter
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREFIX = "no_review_needed_tier1_"
 
 MODELS = [
@@ -37,7 +37,7 @@ def load_json(path):
 
 def check_model(model_key, slug):
     """Return stats for a model's tier1 predictions vs majority vote."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}.json")
     if not os.path.exists(path):
         return None
 
@@ -93,7 +93,7 @@ def main():
         lines.append(s)
 
     # Get total from source file
-    src_path = os.path.join(BASE, "no_review_needed.json")
+    src_path = os.path.join(BASE, "data", "no_review_needed.json")
     src_data = load_json(src_path)
     total_items = len(src_data)
     total_qs = sum(len(d.get("tier1_questions") or []) for d in src_data)
@@ -158,7 +158,7 @@ def main():
     p("- Thinking disabled for all models (perception-only, no reasoning required)")
     p(f"- Question type distribution: {', '.join(f'{t} ({TYPE_NAMES[t]})' for t in ('A', 'B', 'C'))}")
 
-    md_path = os.path.join(BASE, "tier1_results.md")
+    md_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tier1_results.md")
     with open(md_path, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"\nSaved to {md_path}")

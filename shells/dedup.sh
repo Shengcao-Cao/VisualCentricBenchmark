@@ -1,5 +1,5 @@
 python embedding.py \
-    --input all_data.json --output embeddings.npz \
+    --input data/all_data.json --output embeddings.npz \
     --workers 50 --batch-size 100
 
 python cosine_similarity.py \
@@ -7,7 +7,7 @@ python cosine_similarity.py \
     --output cosine_sim.npz
 
 python deduplicate.py \
-    --input all_data.json \
+    --input data/all_data.json \
     --embeddings cosine_sim.npz \
-    --output deduped_data.json \
+    --output data/deduped_data.json \
     --threshold 0.9

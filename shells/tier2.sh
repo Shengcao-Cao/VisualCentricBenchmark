@@ -1,5 +1,5 @@
-INPUT=no_review_needed_substantive.json
-PREFIX=no_review_needed_substantive_tier2
+INPUT=data/no_review_needed_substantive.json
+PREFIX=data/no_review_needed_substantive_tier2
 
 python run_pipeline.py answer_tier2 \
     -i $INPUT -o ${PREFIX}_gpt_5_4.json \

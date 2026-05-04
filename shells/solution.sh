@@ -2,7 +2,7 @@
 python coreset/build_solution.py
 
 python run_pipeline.py answer \
-    -i filtered_data_without_solution.json -o filtered_data_without_solution_gpt_5_4.json \
+    -i data/filtered_data_without_solution.json -o filtered_data_without_solution_gpt_5_4.json \
     --model-name gpt-5.4 \
     --thinking-effort high \
     --api-key $OPENAI_API_KEY \
@@ -18,7 +18,7 @@ python run_pipeline.py judge \
     > filtered_data_without_solution_gpt_5_4.log 2>&1
 
 python run_pipeline.py answer \
-    -i filtered_data_without_solution.json -o filtered_data_without_solution_gemini_3_1_pro_preview.json \
+    -i data/filtered_data_without_solution.json -o filtered_data_without_solution_gemini_3_1_pro_preview.json \
     --model-name gemini-3.1-pro-preview \
     --thinking-effort high \
     --api-key $GOOGLE_API_KEY \

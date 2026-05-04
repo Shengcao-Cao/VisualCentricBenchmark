@@ -6,7 +6,7 @@ import os
 import re
 from collections import Counter
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREFIX = "filtered_data_with_solution_hard_tier3_"
 
 MODELS = [
@@ -45,14 +45,14 @@ def load_json(path):
 
 
 def get_tier3_ids():
-    path = os.path.join(BASE, "filtered_data_with_solution_hard_tier3_fixed.json")
+    path = os.path.join(BASE, "data", "filtered_data_with_solution_hard_tier3_fixed.json")
     data = load_json(path)
     return set(item["id"] for item in data if item is not None)
 
 
 def check_judged(slug):
     """Return (total, correct, incorrect, parse_errors) from judged file."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -80,7 +80,7 @@ def check_judged(slug):
 
 def check_unreadable(slug):
     """Return set of problem IDs where the model complained about unreadable images."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}.json")
     if not os.path.exists(path):
         return set()
     data = load_json(path)
@@ -100,7 +100,7 @@ def check_unreadable(slug):
 
 def check_original(model_key, slug, tier3_ids):
     """Return {id: correct} for the original judged results, filtered to tier3 IDs."""
-    path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -198,7 +198,7 @@ def main():
             p(f"| {slug} | N/A | N/A | N/A |")
             continue
 
-        tier3_path = os.path.join(BASE, f"{PREFIX}{slug}_judged.json")
+        tier3_path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
         tier3_data = load_json(tier3_path)
         tier3_correct = {}
         for item in tier3_data:
@@ -231,7 +231,7 @@ def main():
     p("- All tier3 images were converted from inline SVGs via cairosvg")
 
     # Write markdown
-    md_path = os.path.join(BASE, "tier3_results.md")
+    md_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tier3_results.md")
     with open(md_path, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"\nSaved to {md_path}")

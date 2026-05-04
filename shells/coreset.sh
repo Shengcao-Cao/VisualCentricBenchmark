@@ -1,6 +1,6 @@
 python merge.py
 python validate_and_filter.py
-python visualize.py all_data.json --output dist_all
+python visualize.py data/all_data.json --output dist_all
 
 python sample.py
 python visualize.py sampled_1000.json --output dist_sampled_1000

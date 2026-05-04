@@ -4,7 +4,7 @@ import json
 import os
 from collections import Counter
 
-BASE = os.path.dirname(os.path.abspath(__file__))
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PREFIX = "no_review_needed_substantive_tier2_"
 
 MODELS = [
@@ -28,14 +28,14 @@ def load_json(path):
 
 
 def get_tier2_ids():
-    path = os.path.join(BASE, "no_review_needed_substantive.json")
+    path = os.path.join(BASE, "data", "no_review_needed_substantive.json")
     data = load_json(path)
     return set(item["id"] for item in data if item is not None)
 
 
 def check_judged(slug):
     """Return (total, done, correct, incorrect, parse_errors) from judged file."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -64,7 +64,7 @@ def check_judged(slug):
 
 def check_judged_by_type(slug):
     """Return {question_type: {correct, total}} from judged file."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -89,7 +89,7 @@ def check_judged_by_type(slug):
 
 def get_tier2_correct(slug):
     """Return {id: correct} for tier2 judged results."""
-    path = os.path.join(BASE, f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -109,7 +109,7 @@ def get_tier2_correct(slug):
 
 def get_original_correct(model_key, slug, tier2_ids):
     """Return {id: correct} for original judged results, filtered to tier2 IDs."""
-    path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+    path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -214,7 +214,7 @@ def main():
     p("- Judge model: gemini-3.1-flash-lite-preview")
 
     # Write markdown
-    md_path = os.path.join(BASE, "tier2_results.md")
+    md_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tier2_results.md")
     with open(md_path, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"\nSaved to {md_path}")

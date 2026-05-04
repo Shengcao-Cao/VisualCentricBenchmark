@@ -248,7 +248,7 @@
 
 <div class="top-bar">
   <label>Shard:</label>
-  <input type="text" id="shardInput" placeholder="needs_review_shard_01.json">
+  <input type="text" id="shardInput" placeholder="data/needs_review_shard_01.json">
   <button id="btnLoad">Load</button>
   <span class="progress" id="progressLabel">—</span>
   <label style="margin-left:12px;"><input type="checkbox" id="autosaveToggle" checked> Autosave</label>
@@ -297,7 +297,7 @@ function renderImagePlaceholders(text, images) {
   return escaped.replace(/&lt;image_(\d+)&gt;/g, (match, num) => {
     const i = parseInt(num) - 1;
     if (images && images[i]) {
-      return `<span class="img-placeholder" onclick="openLightbox('${escapeHTML(images[i])}')">[Image ${num}]</span>`;
+      return `<span class="img-placeholder" onclick="openLightbox('${imgPath(escapeHTML(images[i]))}')">[Image ${num}]</span>`;
     }
     return `<span class="img-placeholder">[Image ${num}]</span>`;
   });
@@ -310,6 +310,8 @@ function shortModel(name) {
     .replace(/-v1$/, '').replace(/-preview$/, '')
     .replace('claude-', '').replace('gemini-', 'gem-').replace('gpt-', 'gpt-');
 }
+
+function imgPath(src) { return 'data/' + src; }
 
 function nowIso() { return new Date().toISOString(); }
 
@@ -514,7 +516,7 @@ function renderLeft(p) {
   const imgHtml = images.length
     ? `<div class="images-row">${images.map((src, i) => `
          <div class="img-container" id="leftImg_${i}">
-           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="image ${i+1}">
+           <img src="${imgPath(escapeHTML(src))}" onclick="openLightbox('${imgPath(escapeHTML(src))}')" alt="image ${i+1}">
            <div class="img-label">Image ${i+1}</div>
          </div>`).join('')}</div>`
     : '<div class="empty-hint">(no images)</div>';

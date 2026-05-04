@@ -4,7 +4,7 @@ import json
 import os
 from collections import Counter
 
-BASE = "/Users/shengcao/Downloads/formalized_datasets/coreset"
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MODELS = [
     ("gpt-5.4",                          "gpt_5_4"),
@@ -48,7 +48,7 @@ def main():
     all_results = {}  # slug -> {id: correct}
 
     for model_key, slug in MODELS:
-        path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+        path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
         if not os.path.exists(path):
             p(f"| {slug} | N/A | N/A | N/A | N/A | N/A |")
             continue
@@ -89,7 +89,7 @@ def main():
     p("|---|---|---|")
 
     for model_key, slug in MODELS:
-        path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+        path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
         if not os.path.exists(path):
             p(f"| {slug} | N/A | N/A |")
             continue
@@ -126,7 +126,7 @@ def main():
 
     # Collect domain stats across all models
     # First pass: find domains
-    sample_path = os.path.join(BASE, f"filtered_data_with_solution_hard_{MODELS[0][1]}_judged.json")
+    sample_path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{MODELS[0][1]}_judged.json")
     sample_data = load_json(sample_path)
     domain_counts = Counter(item.get("domain", "unknown") for item in sample_data if item is not None)
     top_domains = [d for d, _ in domain_counts.most_common(8)]
@@ -137,7 +137,7 @@ def main():
     p(sep)
 
     for model_key, slug in MODELS:
-        path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+        path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
         if not os.path.exists(path):
             continue
 
@@ -179,7 +179,7 @@ def main():
     p(sep)
 
     for model_key, slug in MODELS:
-        path = os.path.join(BASE, f"filtered_data_with_solution_hard_{slug}_judged.json")
+        path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
         if not os.path.exists(path):
             continue
 
@@ -214,7 +214,7 @@ def main():
     p(f"- Dataset distribution: {', '.join(f'{d} ({c})' for d, c in dataset_counts.most_common())}")
     p("- Judge model: gemini-3.1-flash-lite-preview")
 
-    md_path = os.path.join(BASE, "tier0_results.md")
+    md_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tier0_results.md")
     with open(md_path, "w") as f:
         f.write("\n".join(lines) + "\n")
     print(f"\nSaved to {md_path}")

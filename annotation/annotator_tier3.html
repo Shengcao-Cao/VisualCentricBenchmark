@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Chemistry Annotator</title>
+<title>Tier3 Annotator</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
@@ -19,7 +19,7 @@
     box-shadow: 0 1px 3px rgba(0,0,0,.08);
   }
   .top-bar label { font-weight: 600; font-size: 13px; color: #555; }
-  .top-bar input[type=text] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 320px; }
+  .top-bar input[type=text] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 420px; }
   .top-bar .progress { font-size: 13px; color: #444; }
   .top-bar .progress .done { color: #137333; font-weight: 700; }
   .top-bar .status { font-size: 12px; color: #888; margin-left: auto; min-width: 140px; text-align: right; }
@@ -48,16 +48,21 @@
   .nav-bar .jump { display: flex; gap: 4px; align-items: center; margin-left: auto; }
   .nav-bar .jump input { width: 80px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
 
+  /* Three independent panels: 2-col top + full-width bottom */
   .layout {
-    display: grid; grid-template-columns: 1fr 2fr;
-    gap: 12px; padding: 12px 20px;
-    height: calc(100vh - 108px); overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 12px;
+    padding: 12px 20px;
+    height: calc(100vh - 108px);
+    overflow: hidden;
   }
   .panel {
     overflow-y: auto; overflow-x: hidden;
     background: #fff; border-radius: 10px; border: 1px solid #e0e0e0;
     box-shadow: 0 1px 4px rgba(0,0,0,.05);
   }
+
   @media (max-width: 1200px) {
     .layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
     .panel { overflow: visible; }
@@ -73,7 +78,10 @@
   .panel-header .finished-chip.done { background: #e6f4ea; color: #137333; }
   .panel-body { padding: 16px 18px; }
 
-  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 11px; font-weight: 600;
+  }
   .badge.dataset { background: #e8f0fe; color: #1a73e8; }
   .badge.domain { background: #fce8e6; color: #d93025; }
   .badge.qtype { background: #e6f4ea; color: #137333; }
@@ -125,25 +133,38 @@
     margin-bottom: 10px;
   }
 
-  /* Annotation */
+  /* Hints */
+  .hint-collapsible {
+    background: #f3f6fb; border-left: 3px solid #4a6fb5; border-radius: 4px;
+    padding: 6px 10px; margin-bottom: 8px; font-size: 12px;
+  }
+  .hint-collapsible summary { cursor: pointer; font-weight: 700; color: #4a6fb5; user-select: none; }
+  .hint-collapsible[open] summary { margin-bottom: 6px; }
+  .hint-body { white-space: pre-wrap; word-break: break-word; line-height: 1.5; }
+
+  .diff-eq  { color: inherit; }
+  .diff-del { background: #fce8e6; color: #c5221f; text-decoration: line-through; padding: 0 2px; border-radius: 2px; }
+  .diff-ins { background: #e6f4ea; color: #137333; padding: 0 2px; border-radius: 2px; }
+  .diff-body { white-space: pre-wrap; word-break: break-word; line-height: 1.6; margin-top: 4px; }
+
+  .fact-list { margin: 4px 0 0 18px; font-size: 12px; }
+  .fact-list li { margin-bottom: 2px; }
+
+  /* Annotation controls */
   .annot-section {
     border-top: 2px solid #e0e0e0; padding-top: 14px; margin-top: 14px;
   }
   .annot-section .section-label { color: #1a73e8; }
   .annot-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
-  .annot-row .annot-label { font-size: 13px; color: #444; font-weight: 600; min-width: 260px; }
+  .annot-row .annot-label { font-size: 13px; color: #444; font-weight: 600; min-width: 200px; }
   .annot-row label { font-size: 13px; color: #444; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
   .annot-row label input[type=radio] { margin: 0; }
-  .annot-row label:has(input:checked) { font-weight: 700; }
-  .annot-row .label-good:has(input:checked) { color: #137333; }
-  .annot-row .label-minor:has(input:checked) { color: #b06000; }
-  .annot-row .label-reject:has(input:checked) { color: #d93025; }
+  .annot-row label:has(input:checked) { color: #1a73e8; font-weight: 700; }
 
-  .comment-block { margin-bottom: 8px; }
-  .comment-block .comment-label { font-size: 12px; color: #666; margin-bottom: 3px; }
-  .comment-input {
-    width: 100%; padding: 6px 10px; border: 1px solid #c8d0da; border-radius: 6px;
-    font-size: 13px; font-family: inherit;
+  .annot-textarea {
+    width: 100%; min-height: 100px; padding: 8px 10px;
+    border: 1px solid #c8d0da; border-radius: 6px; font-size: 13px;
+    font-family: inherit; line-height: 1.5; resize: vertical;
   }
 
   .empty-hint { color: #999; font-style: italic; font-size: 13px; padding: 12px 0; }
@@ -161,11 +182,11 @@
 
 <div class="top-bar">
   <label>File:</label>
-  <input type="text" id="fileInput" placeholder="chemistry_unreviewed_fixed.json">
+  <input type="text" id="fileInput" placeholder="data/filtered_data_with_solution_hard_tier3_jpg_pruned_fixed.json">
   <button id="btnLoad">Load</button>
   <span class="progress" id="progressLabel">—</span>
   <label style="margin-left:12px;"><input type="checkbox" id="autosaveToggle" checked> Autosave</label>
-  <label><input type="checkbox" id="latexToggle" checked> Render LaTeX</label>
+  <label><input type="checkbox" id="latexToggle"> Render LaTeX</label>
   <button id="btnSave" class="primary">Save</button>
   <span class="status" id="statusLabel"></span>
 </div>
@@ -210,18 +231,60 @@ function renderImagePlaceholders(text, images) {
   return escaped.replace(/&lt;image_(\d+)&gt;/g, (match, num) => {
     const i = parseInt(num) - 1;
     if (images && images[i]) {
-      return `<span class="img-placeholder" onclick="openLightbox('${escapeHTML(images[i])}')">[Image ${num}]</span>`;
+      return `<span class="img-placeholder" onclick="openLightbox('${imgPath(escapeHTML(images[i]))}')">[Image ${num}]</span>`;
     }
     return `<span class="img-placeholder">[Image ${num}]</span>`;
   });
 }
 
+function imgPath(src) { return 'data/' + src; }
+
 function nowIso() { return new Date().toISOString(); }
+
+// ========== word-level diff (LCS) ==========
+function tokenizeForDiff(s) {
+  return (s || '').match(/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff\u3040-\u30ff]|[A-Za-z0-9_]+|\s+|./gu) || [];
+}
+function wordDiff(a, b) {
+  const A = tokenizeForDiff(a), B = tokenizeForDiff(b);
+  const m = A.length, n = B.length;
+  const dp = Array.from({ length: m + 1 }, () => new Int32Array(n + 1));
+  for (let i = m - 1; i >= 0; i--) {
+    for (let j = n - 1; j >= 0; j--) {
+      dp[i][j] = A[i] === B[j] ? dp[i + 1][j + 1] + 1
+                               : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  const ops = [];
+  let i = 0, j = 0;
+  while (i < m && j < n) {
+    if (A[i] === B[j])           { ops.push(['eq',  A[i++]]); j++; }
+    else if (dp[i + 1][j] >= dp[i][j + 1]) ops.push(['del', A[i++]]);
+    else                                    ops.push(['ins', B[j++]]);
+  }
+  while (i < m) ops.push(['del', A[i++]]);
+  while (j < n) ops.push(['ins', B[j++]]);
+  return ops;
+}
+function renderWordDiff(orig, pruned) {
+  if (!orig && !pruned) return '<em style="color:#999;">(empty)</em>';
+  const ops = wordDiff(orig || '', pruned || '');
+  if (!ops.some(o => o[0] !== 'eq')) {
+    return '<em style="color:#888;">(no changes — pruned text is identical to original)</em>';
+  }
+  return ops.map(([t, w]) => {
+    const html = escapeHTML(w);
+    if (t === 'eq')  return `<span class="diff-eq">${html}</span>`;
+    if (t === 'del') return `<span class="diff-del">${html}</span>`;
+    return `<span class="diff-ins">${html}</span>`;
+  }).join('');
+}
 
 // ========== lightbox ==========
 function openLightbox(src) {
+  const lb = document.getElementById('lightbox');
   document.getElementById('lightboxImg').src = src;
-  document.getElementById('lightbox').classList.add('active');
+  lb.classList.add('active');
 }
 document.getElementById('lightbox').addEventListener('click', () => {
   document.getElementById('lightbox').classList.remove('active');
@@ -242,10 +305,14 @@ function renderOptions(opts, images) {
 
 // ========== finished detection ==========
 function isProblemFinished(p) {
-  const tq = (p.tier3_questions || [])[0];
-  if (!tq) return false;
-  const a = tq.annotation;
-  if (!a || !a.verdict) return false;
+  const tp = (p.tier3_pruned_questions || [])[0];
+  if (!tp) return false;
+  const a = tp.annotation;
+  if (!a) return false;
+  if (typeof a.prunable !== 'boolean') return false;
+  if (a.prunable && !(a.corrected_pruned_question && a.corrected_pruned_question.trim())) return false;
+  if (!a.image_equivalence) return false;
+  if (!a.difficulty) return false;
   return true;
 }
 
@@ -282,8 +349,9 @@ async function saveCurrent() {
   saving = true;
   setStatus('saving…');
   const p = problems[idx];
-  const tq = (p.tier3_questions || [])[0];
-  const annotation = tq && tq.annotation ? tq.annotation : null;
+  const tp = (p.tier3_pruned_questions || [])[0];
+  const annotation = tp && tp.annotation ? tp.annotation : null;
+
   try {
     const res = await fetch('/save', {
       method: 'POST',
@@ -320,8 +388,9 @@ function renderAll() {
   if (!problems.length) return;
   renderProgress();
   const p = problems[idx];
-  document.getElementById('layout').innerHTML = renderLeft(p) + renderRight(p);
-  bindEvents(p);
+  document.getElementById('layout').innerHTML =
+    renderPanelLeft(p) + renderPanelRight(p);
+  bindAnnotationEvents(p);
   maybeRenderLatex();
 }
 
@@ -343,11 +412,11 @@ function maybeRenderLatex() {
       errorColor: '#d93025',
       ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'input'],
     });
-  } catch (e) {}
+  } catch (e) { /* best-effort */ }
 }
 
-// ----- Left: Original Problem -----
-function renderLeft(p) {
+// ----- Panel 1: Top-Left — Original Problem -----
+function renderPanelLeft(p) {
   const badges = [];
   if (p.dataset) badges.push(`<span class="badge dataset">${escapeHTML(p.dataset)}</span>`);
   if (p.domain) badges.push(`<span class="badge domain">${escapeHTML(p.domain)}</span>`);
@@ -358,7 +427,7 @@ function renderLeft(p) {
   const imgHtml = images.length
     ? `<div class="images-row">${images.map((src, i) => `
          <div class="img-container">
-           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="image ${i+1}">
+           <img src="${imgPath(escapeHTML(src))}" onclick="openLightbox('${imgPath(escapeHTML(src))}')" alt="image ${i+1}">
            <div class="img-label">Image ${i+1}</div>
          </div>`).join('')}</div>`
     : '<div class="empty-hint">(no images)</div>';
@@ -366,7 +435,7 @@ function renderLeft(p) {
   const answer = Array.isArray(p.answer) ? p.answer.join(', ') : (p.answer ?? '');
 
   return `
-  <div class="panel">
+  <div class="panel panel-left">
     <div class="panel-header">
       <span class="id">${escapeHTML(p.id || '')}</span>
       ${badges.join(' ')}
@@ -384,121 +453,233 @@ function renderLeft(p) {
   </div>`;
 }
 
-// ----- Right: Edited Problem + Annotation -----
-function renderRight(p) {
+// ----- Panel 2: Right — Tier3 + Pruned + Hints + Annotation -----
+function renderPanelRight(p) {
   const t3 = (p.tier3_questions || [])[0];
-  if (!t3) return `<div class="panel"><div class="panel-body"><div class="empty-hint">No edited question.</div></div></div>`;
+  const tp = (p.tier3_pruned_questions || [])[0];
+  if (!t3) return `<div class="panel"><div class="panel-body"><div class="empty-hint">No tier3 question.</div></div></div>`;
 
   const t3Images = t3.images || [];
   const imgHtml = t3Images.length
     ? `<div class="images-row">${t3Images.map((src, i) => `
          <div class="img-container">
-           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="edited image ${i+1}">
-           <div class="img-label">Edited Image ${i+1}</div>
+           <img src="${imgPath(escapeHTML(src))}" onclick="openLightbox('${imgPath(escapeHTML(src))}')" alt="tier3 image ${i+1}">
+           <div class="img-label">Tier3 Image ${i+1}</div>
          </div>`).join('')}</div>`
-    : '<div class="empty-hint">(no edited images)</div>';
+    : '<div class="empty-hint">(no tier3 images)</div>';
 
   const answer = Array.isArray(t3.answer) ? t3.answer.join(', ') : (t3.answer ?? '');
+
+  // Pruned question (plain text, not diff)
+  const prunedHtml = tp && tp.pruned_question
+    ? `<div class="section-label">Tier3 Pruned Question</div>
+       <div class="question-text">${renderImagePlaceholders(tp.pruned_question, t3Images)}</div>`
+    : '';
+
   const finishedChip = isProblemFinished(p)
     ? '<span class="finished-chip done">✓ finished</span>'
     : '<span class="finished-chip">in progress</span>';
 
-  // Annotation
-  const ann = t3.annotation || {};
-  const verdict = ann.verdict || '';
-  const showComments = verdict === 'minor_fix';
+  // ----- Hints (all collapsible, collapsed by default) -----
+  const hints = [];
+  if (tp) {
+    if (tp.masked_question) {
+      hints.push(`
+        <details class="hint-collapsible">
+          <summary>Masked question</summary>
+          <div class="hint-body">${escapeHTML(tp.masked_question)}</div>
+        </details>`);
+    }
+    if (tp.recovered_question) {
+      hints.push(`
+        <details class="hint-collapsible">
+          <summary>Recovered question</summary>
+          <div class="hint-body">${escapeHTML(tp.recovered_question)}</div>
+        </details>`);
+    }
+    if (tp.pruned_question != null && t3.question != null) {
+      hints.push(`
+        <details class="hint-collapsible">
+          <summary>Word diff (tier3 question → pruned)</summary>
+          <div class="diff-body">${renderWordDiff(t3.question, tp.pruned_question)}</div>
+        </details>`);
+    }
+    if (tp.binary_label !== 2 && tp.explanation) {
+      hints.push(`
+        <details class="hint-collapsible">
+          <summary>Stage-3 explanation (binary_label=${tp.binary_label})</summary>
+          <div class="hint-body">${escapeHTML(tp.explanation)}</div>
+        </details>`);
+    }
+    const missingFacts = (tp.stage4_labels || []).filter(x => x && (x.label === 'None' || x.label === 'none'));
+    if (missingFacts.length) {
+      hints.push(`
+        <details class="hint-collapsible">
+          <summary>Facts flagged as missing</summary>
+          <ul class="fact-list">${missingFacts.map(f => `<li>${escapeHTML(f.fact)}</li>`).join('')}</ul>
+        </details>`);
+    }
+  }
+
+  // ----- Annotation controls -----
+  let annotHtml = '';
+  if (tp) {
+    const ann = tp.annotation || {};
+    const prunable = ann.prunable;
+    const corrected = ann.corrected_pruned_question ?? tp.pruned_question ?? '';
+    const imgEq = ann.image_equivalence || '';
+    const diff = ann.difficulty || '';
+    const imgHasText = ann.image_has_text || false;
+    const rejected = ann.rejected || false;
+    const yesChecked = prunable === true ? 'checked' : '';
+    const noChecked = prunable === false ? 'checked' : '';
+    const showTextarea = prunable === true;
+
+    annotHtml = `
+      <div class="annot-section">
+        <div class="section-label">Annotation</div>
+        <div class="annot-row">
+          <span class="annot-label">1. Is this problem prunable?</span>
+          <label><input type="radio" name="ann_prunable" value="yes" ${yesChecked}> <span>Yes</span></label>
+          <label><input type="radio" name="ann_prunable" value="no" ${noChecked}> <span>No</span></label>
+        </div>
+        <div style="${showTextarea ? '' : 'display:none;'}" data-row="corrected_text">
+          <div style="font-size:12px;color:#666;margin-bottom:4px;">Corrected pruned question:</div>
+          <textarea class="annot-textarea" id="correctedTextarea">${escapeHTML(corrected)}</textarea>
+        </div>
+        <div class="annot-row" style="margin-top:8px;">
+          <span class="annot-label">2. Are tier3 images equivalent?</span>
+          <label><input type="radio" name="ann_imgeq" value="equivalent" ${imgEq === 'equivalent' ? 'checked' : ''}> <span>Equivalent reproduction</span></label>
+          <label><input type="radio" name="ann_imgeq" value="edited" ${imgEq === 'edited' ? 'checked' : ''}> <span>Edited/added/removed elements</span></label>
+        </div>
+        <div class="annot-row" style="margin-top:8px;">
+          <span class="annot-label">3. Difficulty vs original?</span>
+          <label><input type="radio" name="ann_diff" value="easier" ${diff === 'easier' ? 'checked' : ''}> <span>Easier</span></label>
+          <label><input type="radio" name="ann_diff" value="same" ${diff === 'same' ? 'checked' : ''}> <span>Same</span></label>
+          <label><input type="radio" name="ann_diff" value="harder" ${diff === 'harder' ? 'checked' : ''}> <span>Harder</span></label>
+        </div>
+        <div class="annot-row" style="margin-top:8px;">
+          <label style="color:#b06000;"><input type="checkbox" id="ann_imgtext" ${imgHasText ? 'checked' : ''}>
+            <span>The edited image includes problem text and/or options, which should be removed.</span></label>
+        </div>
+        <div class="annot-row" style="margin-top:4px;">
+          <label style="color:#d93025;"><input type="checkbox" id="ann_rejected" ${rejected ? 'checked' : ''}>
+            <span>The edited problem should be rejected because it is not solvable.</span></label>
+        </div>
+      </div>`;
+  }
 
   return `
   <div class="panel">
     <div class="panel-header">
       <span class="id">${escapeHTML(t3.question_id || '')}</span>
-      <span class="badge tier">EDITED</span>
+      <span class="badge tier">TIER 3</span>
+      ${tp ? `<span class="badge tier" style="background:#fef7e0;color:#b06000;">+ PRUNED</span>` : ''}
       ${finishedChip}
     </div>
     <div class="panel-body">
-      <div class="section-label">Edited Images</div>
+      <div class="section-label">Tier3 Images</div>
       ${imgHtml}
-      <div class="section-label">Edited Question</div>
+      <div class="section-label">Tier3 Question</div>
       <div class="question-text">${renderImagePlaceholders(t3.question || '', t3Images)}</div>
+      ${prunedHtml}
       ${renderOptions(t3.options, t3Images)}
-      <div class="section-label">Edited Answer</div>
+      <div class="section-label">Tier3 Answer</div>
       <div class="answer-box">${escapeHTML(answer || '(none)')}</div>
-
-      <div class="annot-section">
-        <div class="section-label">Annotation</div>
-        <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:10px;padding:8px 10px;background:#f8f9fa;border-radius:6px;">
-          Compare the edited problem (right) against the original (left). Check whether the edited image, question, options, and answer are faithful and solvable.
-          <br><b>All good</b> — the edit is correct and complete.
-          <b>Needs minor revision</b> — mostly fine but some parts need fixing (describe below).
-          <b>Not reasonable</b> — the edit is fundamentally broken and not easily fixable.
-        </div>
-        <div class="annot-row">
-          <span class="annot-label">Is the edited question reasonable?</span>
-          <label class="label-good"><input type="radio" name="verdict" value="all_good" ${verdict === 'all_good' ? 'checked' : ''}> <span>All good</span></label>
-          <label class="label-minor"><input type="radio" name="verdict" value="minor_fix" ${verdict === 'minor_fix' ? 'checked' : ''}> <span>Needs minor revision</span></label>
-          <label class="label-reject"><input type="radio" name="verdict" value="reject" ${verdict === 'reject' ? 'checked' : ''}> <span>Not reasonable</span></label>
-        </div>
-        <div data-row="comments" style="${showComments ? '' : 'display:none;'}">
-          <div class="comment-block">
-            <div class="comment-label">How to revise the image:</div>
-            <input type="text" class="comment-input" data-field="fix_image" value="${escapeHTML(ann.fix_image || '')}" placeholder="Leave blank if no change needed">
-          </div>
-          <div class="comment-block">
-            <div class="comment-label">How to revise the question:</div>
-            <input type="text" class="comment-input" data-field="fix_question" value="${escapeHTML(ann.fix_question || '')}" placeholder="Leave blank if no change needed">
-          </div>
-          <div class="comment-block">
-            <div class="comment-label">How to revise the options:</div>
-            <input type="text" class="comment-input" data-field="fix_options" value="${escapeHTML(ann.fix_options || '')}" placeholder="Leave blank if no change needed">
-          </div>
-          <div class="comment-block">
-            <div class="comment-label">How to revise the answer:</div>
-            <input type="text" class="comment-input" data-field="fix_answer" value="${escapeHTML(ann.fix_answer || '')}" placeholder="Leave blank if no change needed">
-          </div>
-        </div>
-      </div>
+      ${hints.length ? '<div class="section-label" style="margin-top:16px;">Hints</div>' + hints.join('') : ''}
+      ${annotHtml}
     </div>
   </div>`;
 }
 
+// (Bottom panel removed — content merged into right panel)
+
 // ========== event wiring ==========
-function bindEvents(p) {
-  const tq = (p.tier3_questions || [])[0];
-  if (!tq) return;
+function bindAnnotationEvents(p) {
+  const tp = (p.tier3_pruned_questions || [])[0];
+  if (!tp) return;
 
-  // Verdict radios
-  document.querySelectorAll('input[name="verdict"]').forEach(el => {
+  // 1. Prunable radio
+  document.querySelectorAll('input[name="ann_prunable"]').forEach(el => {
     el.addEventListener('change', () => {
-      tq.annotation = tq.annotation || {};
-      tq.annotation.verdict = el.value;
-      tq.annotation.annotated_at = nowIso();
-
-      const commentsRow = document.querySelector('[data-row="comments"]');
-      if (el.value === 'minor_fix') {
-        if (commentsRow) commentsRow.style.display = '';
+      tp.annotation = tp.annotation || {};
+      tp.annotation.prunable = (el.value === 'yes');
+      tp.annotation.annotated_at = nowIso();
+      const textRow = document.querySelector('[data-row="corrected_text"]');
+      if (tp.annotation.prunable) {
+        if (textRow) textRow.style.display = '';
+        const ta = document.getElementById('correctedTextarea');
+        if (ta && !tp.annotation.corrected_pruned_question) {
+          tp.annotation.corrected_pruned_question = ta.value || tp.pruned_question || '';
+        }
       } else {
-        if (commentsRow) commentsRow.style.display = 'none';
-        tq.annotation.fix_question = null;
-        tq.annotation.fix_options = null;
-        tq.annotation.fix_image = null;
-        tq.annotation.fix_answer = null;
+        tp.annotation.corrected_pruned_question = null;
+        if (textRow) textRow.style.display = 'none';
       }
-
       updateFinishedChip(p);
       renderProgress();
       scheduleAutosave();
     });
   });
 
-  // Comment inputs
-  document.querySelectorAll('.comment-input[data-field]').forEach(el => {
-    el.addEventListener('input', () => {
-      tq.annotation = tq.annotation || {};
-      tq.annotation[el.dataset.field] = el.value;
-      tq.annotation.annotated_at = nowIso();
+  // Textarea for corrected pruned question
+  const ta = document.getElementById('correctedTextarea');
+  if (ta) {
+    ta.addEventListener('input', () => {
+      tp.annotation = tp.annotation || {};
+      tp.annotation.corrected_pruned_question = ta.value;
+      tp.annotation.annotated_at = nowIso();
+      updateFinishedChip(p);
+      renderProgress();
+      scheduleAutosave();
+    });
+  }
+
+  // 2. Image equivalence radio
+  document.querySelectorAll('input[name="ann_imgeq"]').forEach(el => {
+    el.addEventListener('change', () => {
+      tp.annotation = tp.annotation || {};
+      tp.annotation.image_equivalence = el.value;
+      tp.annotation.annotated_at = nowIso();
+      updateFinishedChip(p);
+      renderProgress();
       scheduleAutosave();
     });
   });
+
+  // 3. Difficulty radio
+  document.querySelectorAll('input[name="ann_diff"]').forEach(el => {
+    el.addEventListener('change', () => {
+      tp.annotation = tp.annotation || {};
+      tp.annotation.difficulty = el.value;
+      tp.annotation.annotated_at = nowIso();
+      updateFinishedChip(p);
+      renderProgress();
+      scheduleAutosave();
+    });
+  });
+
+  // 4. Image has text checkbox
+  const imgTextEl = document.getElementById('ann_imgtext');
+  if (imgTextEl) {
+    imgTextEl.addEventListener('change', () => {
+      tp.annotation = tp.annotation || {};
+      tp.annotation.image_has_text = imgTextEl.checked;
+      tp.annotation.annotated_at = nowIso();
+      scheduleAutosave();
+    });
+  }
+
+  // 5. Rejected checkbox
+  const rejectedEl = document.getElementById('ann_rejected');
+  if (rejectedEl) {
+    rejectedEl.addEventListener('change', () => {
+      tp.annotation = tp.annotation || {};
+      tp.annotation.rejected = rejectedEl.checked;
+      tp.annotation.annotated_at = nowIso();
+      scheduleAutosave();
+    });
+  }
 }
 
 function updateFinishedChip(p) {
@@ -540,6 +721,7 @@ document.getElementById('btnLoad').addEventListener('click', () => {
   if (name) loadFile(name);
 });
 document.getElementById('btnSave').addEventListener('click', saveCurrent);
+
 document.getElementById('latexToggle').addEventListener('change', maybeRenderLatex);
 
 // keyboard nav
