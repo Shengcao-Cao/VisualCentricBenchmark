@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chemistry Annotator</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"
+        onload="window.__katexReady=true; if (typeof maybeRenderLatex==='function') maybeRenderLatex();"></script>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+
+  .top-bar {
+    position: sticky; top: 0; z-index: 100;
+    background: #fff; border-bottom: 1px solid #ddd;
+    padding: 10px 20px; display: flex; flex-wrap: wrap; gap: 12px; align-items: center;
+    box-shadow: 0 1px 3px rgba(0,0,0,.08);
+  }
+  .top-bar label { font-weight: 600; font-size: 13px; color: #555; }
+  .top-bar input[type=text] { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; width: 320px; }
+  .top-bar .progress { font-size: 13px; color: #444; }
+  .top-bar .progress .done { color: #137333; font-weight: 700; }
+  .top-bar .status { font-size: 12px; color: #888; margin-left: auto; min-width: 140px; text-align: right; }
+  .top-bar .status.error { color: #d93025; }
+  .top-bar .status.ok { color: #137333; }
+  .top-bar button {
+    padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  .top-bar button:hover { background: #eee; }
+  .top-bar button.primary { background: #1a73e8; color: #fff; border-color: #1a73e8; }
+  .top-bar button.primary:hover { background: #1557b0; }
+
+  .nav-bar {
+    position: sticky; top: 52px; z-index: 99;
+    background: #fafafa; border-bottom: 1px solid #e0e0e0;
+    padding: 8px 20px; display: flex; gap: 8px; align-items: center;
+  }
+  .nav-bar button {
+    padding: 6px 14px; border: 1px solid #ccc; border-radius: 6px;
+    background: #fff; cursor: pointer; font-size: 13px;
+  }
+  .nav-bar button:hover { background: #eee; }
+  .nav-bar button:disabled { opacity: .4; cursor: default; }
+  .nav-bar .page-info { font-size: 13px; color: #666; margin: 0 8px; }
+  .nav-bar .jump { display: flex; gap: 4px; align-items: center; margin-left: auto; }
+  .nav-bar .jump input { width: 80px; padding: 5px 8px; border: 1px solid #ccc; border-radius: 6px; font-size: 13px; }
+
+  .layout {
+    display: grid; grid-template-columns: 1fr 2fr;
+    gap: 12px; padding: 12px 20px;
+    height: calc(100vh - 108px); overflow: hidden;
+  }
+  .panel {
+    overflow-y: auto; overflow-x: hidden;
+    background: #fff; border-radius: 10px; border: 1px solid #e0e0e0;
+    box-shadow: 0 1px 4px rgba(0,0,0,.05);
+  }
+  @media (max-width: 1200px) {
+    .layout { grid-template-columns: 1fr; height: auto; overflow: visible; }
+    .panel { overflow: visible; }
+  }
+
+  .panel-header {
+    position: sticky; top: 0; z-index: 10;
+    padding: 12px 18px; background: #f8f9fa; border-bottom: 1px solid #e8e8e8;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  }
+  .panel-header .id { font-weight: 700; font-size: 14px; color: #1a73e8; }
+  .panel-header .finished-chip { margin-left: auto; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px; background: #eceff1; color: #546e7a; }
+  .panel-header .finished-chip.done { background: #e6f4ea; color: #137333; }
+  .panel-body { padding: 16px 18px; }
+
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; }
+  .badge.dataset { background: #e8f0fe; color: #1a73e8; }
+  .badge.domain { background: #fce8e6; color: #d93025; }
+  .badge.qtype { background: #e6f4ea; color: #137333; }
+  .badge.subdomain { background: #fef7e0; color: #b06000; }
+  .badge.tier { background: #e3f2fd; color: #0d47a1; }
+
+  .section-label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    color: #888; letter-spacing: .5px; margin: 12px 0 6px;
+  }
+  .section-label:first-child { margin-top: 0; }
+
+  .question-text {
+    font-size: 14px; line-height: 1.65;
+    white-space: pre-wrap; word-break: break-word; margin-bottom: 12px;
+  }
+  .img-placeholder {
+    display: inline-block; vertical-align: middle;
+    background: #e8f0fe; color: #1a73e8; padding: 1px 6px;
+    border-radius: 4px; font-size: 12px; font-weight: 600; cursor: pointer;
+  }
+  .img-placeholder:hover { background: #c6dafa; }
+
+  .images-row { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .img-container {
+    border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden;
+    background: #fafafa; text-align: center; max-width: 340px;
+    transition: border-color .3s, box-shadow .3s;
+  }
+  .img-container img {
+    display: block; max-width: 100%; max-height: 280px;
+    object-fit: contain; margin: 0 auto; cursor: zoom-in;
+  }
+  .img-container .img-label {
+    padding: 4px 8px; font-size: 11px; color: #666;
+    background: #f0f0f0; border-top: 1px solid #e0e0e0;
+  }
+
+  .options-list { margin-bottom: 10px; }
+  .option-item {
+    display: flex; gap: 8px; padding: 4px 10px; margin-bottom: 3px;
+    border-radius: 5px; font-size: 13px; line-height: 1.5;
+  }
+  .option-letter { font-weight: 700; min-width: 18px; color: #555; }
+
+  .answer-box {
+    font-size: 14px; line-height: 1.55; padding: 8px 12px;
+    background: #f8f9fa; border-radius: 6px; white-space: pre-wrap; word-break: break-word;
+    margin-bottom: 10px;
+  }
+
+  /* Annotation */
+  .annot-section {
+    border-top: 2px solid #e0e0e0; padding-top: 14px; margin-top: 14px;
+  }
+  .annot-section .section-label { color: #1a73e8; }
+  .annot-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 10px; }
+  .annot-row .annot-label { font-size: 13px; color: #444; font-weight: 600; min-width: 260px; }
+  .annot-row label { font-size: 13px; color: #444; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; }
+  .annot-row label input[type=radio] { margin: 0; }
+  .annot-row label:has(input:checked) { font-weight: 700; }
+  .annot-row .label-good:has(input:checked) { color: #137333; }
+  .annot-row .label-minor:has(input:checked) { color: #b06000; }
+  .annot-row .label-reject:has(input:checked) { color: #d93025; }
+
+  .comment-block { margin-bottom: 8px; }
+  .comment-block .comment-label { font-size: 12px; color: #666; margin-bottom: 3px; }
+  .comment-input {
+    width: 100%; padding: 6px 10px; border: 1px solid #c8d0da; border-radius: 6px;
+    font-size: 13px; font-family: inherit;
+  }
+
+  .empty-hint { color: #999; font-style: italic; font-size: 13px; padding: 12px 0; }
+  .loading { text-align: center; padding: 60px; font-size: 18px; color: #888; grid-column: 1 / -1; }
+
+  .lightbox {
+    display: none; position: fixed; inset: 0; z-index: 1000;
+    background: rgba(0,0,0,.85); align-items: center; justify-content: center; cursor: zoom-out;
+  }
+  .lightbox.active { display: flex; }
+  .lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; border-radius: 8px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <label>File:</label>
+  <input type="text" id="fileInput" placeholder="chemistry_unreviewed_fixed.json">
+  <button id="btnLoad">Load</button>
+  <span class="progress" id="progressLabel">—</span>
+  <label style="margin-left:12px;"><input type="checkbox" id="autosaveToggle" checked> Autosave</label>
+  <label><input type="checkbox" id="latexToggle" checked> Render LaTeX</label>
+  <button id="btnSave" class="primary">Save</button>
+  <span class="status" id="statusLabel"></span>
+</div>
+
+<div class="nav-bar">
+  <button id="btnFirst">⟨⟨ First</button>
+  <button id="btnPrev">⟨ Prev</button>
+  <span class="page-info" id="pageInfo">—</span>
+  <button id="btnNext">Next ⟩</button>
+  <button id="btnLast">Last ⟩⟩</button>
+  <button id="btnNextUnfinished" style="margin-left:12px;">Next unfinished ⟩</button>
+  <div class="jump">
+    <input type="text" id="jumpInput" placeholder="Go to #">
+    <button id="btnJump">Go</button>
+  </div>
+</div>
+
+<div class="layout" id="layout">
+  <div class="loading" id="loadingMsg">Enter a data filename and press Load.</div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <img id="lightboxImg" src="">
+</div>
+
+<script>
+// ========== state ==========
+let fileName = '';
+let problems = [];
+let idx = 0;
+let saving = false;
+let saveTimer = null;
+
+// ========== utils ==========
+function escapeHTML(str) {
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;').replace(/\$/g, '&#36;');
+}
+
+function renderImagePlaceholders(text, images) {
+  const escaped = escapeHTML(text);
+  return escaped.replace(/&lt;image_(\d+)&gt;/g, (match, num) => {
+    const i = parseInt(num) - 1;
+    if (images && images[i]) {
+      return `<span class="img-placeholder" onclick="openLightbox('${escapeHTML(images[i])}')">[Image ${num}]</span>`;
+    }
+    return `<span class="img-placeholder">[Image ${num}]</span>`;
+  });
+}
+
+function nowIso() { return new Date().toISOString(); }
+
+// ========== lightbox ==========
+function openLightbox(src) {
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('active');
+}
+document.getElementById('lightbox').addEventListener('click', () => {
+  document.getElementById('lightbox').classList.remove('active');
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') document.getElementById('lightbox').classList.remove('active');
+});
+
+// ========== options rendering ==========
+function renderOptions(opts, images) {
+  if (!opts || !Array.isArray(opts) || opts.length === 0) return '';
+  const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  return `<div class="options-list">${opts.map((o, i) =>
+    `<div class="option-item"><span class="option-letter">${letters[i] || '?'}</span>
+      <span>${renderImagePlaceholders(String(o), images)}</span></div>`
+  ).join('')}</div>`;
+}
+
+// ========== finished detection ==========
+function isProblemFinished(p) {
+  const tq = (p.tier3_questions || [])[0];
+  if (!tq) return false;
+  const a = tq.annotation;
+  if (!a || !a.verdict) return false;
+  return true;
+}
+
+// ========== load / save ==========
+function setStatus(text, kind = '') {
+  const el = document.getElementById('statusLabel');
+  el.textContent = text;
+  el.className = 'status' + (kind ? ' ' + kind : '');
+}
+
+async function loadFile(name) {
+  setStatus('loading…');
+  try {
+    const res = await fetch(name, { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error('file is not a JSON array');
+    fileName = name;
+    problems = data;
+    idx = 0;
+    document.getElementById('loadingMsg')?.remove();
+    renderAll();
+    setStatus(`loaded ${problems.length} problems`, 'ok');
+    const firstUnfinished = problems.findIndex(p => !isProblemFinished(p));
+    if (firstUnfinished > 0) { idx = firstUnfinished; renderAll(); }
+  } catch (e) {
+    setStatus('load failed: ' + e.message, 'error');
+    document.getElementById('layout').innerHTML = `<div class="loading">Failed to load ${escapeHTML(name)}: ${escapeHTML(e.message)}</div>`;
+  }
+}
+
+async function saveCurrent() {
+  if (!problems.length || saving) return;
+  saving = true;
+  setStatus('saving…');
+  const p = problems[idx];
+  const tq = (p.tier3_questions || [])[0];
+  const annotation = tq && tq.annotation ? tq.annotation : null;
+  try {
+    const res = await fetch('/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file: fileName, problem_id: p.id, annotation }),
+    });
+    const body = await res.json();
+    if (!res.ok || !body.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    setStatus('saved ' + new Date().toLocaleTimeString(), 'ok');
+    renderProgress();
+  } catch (e) {
+    setStatus('save failed: ' + e.message, 'error');
+  } finally {
+    saving = false;
+  }
+}
+
+function scheduleAutosave() {
+  if (!document.getElementById('autosaveToggle').checked) return;
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(saveCurrent, 600);
+}
+
+// ========== rendering ==========
+function renderProgress() {
+  const done = problems.filter(isProblemFinished).length;
+  document.getElementById('progressLabel').innerHTML =
+    `<span class="done">${done}</span> / ${problems.length} finished`;
+  document.getElementById('pageInfo').textContent =
+    problems.length ? `${idx + 1} / ${problems.length}` : '—';
+}
+
+function renderAll() {
+  if (!problems.length) return;
+  renderProgress();
+  const p = problems[idx];
+  document.getElementById('layout').innerHTML = renderLeft(p) + renderRight(p);
+  bindEvents(p);
+  maybeRenderLatex();
+}
+
+function maybeRenderLatex() {
+  const toggle = document.getElementById('latexToggle');
+  if (!toggle || !toggle.checked) return;
+  if (!window.__katexReady || !window.renderMathInElement) return;
+  const layout = document.getElementById('layout');
+  if (!layout) return;
+  try {
+    renderMathInElement(layout, {
+      delimiters: [
+        { left: '$$', right: '$$', display: true },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\[', right: '\\]', display: true },
+        { left: '\\(', right: '\\)', display: false },
+      ],
+      throwOnError: false,
+      errorColor: '#d93025',
+      ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'input'],
+    });
+  } catch (e) {}
+}
+
+// ----- Left: Original Problem -----
+function renderLeft(p) {
+  const badges = [];
+  if (p.dataset) badges.push(`<span class="badge dataset">${escapeHTML(p.dataset)}</span>`);
+  if (p.domain) badges.push(`<span class="badge domain">${escapeHTML(p.domain)}</span>`);
+  if (p.subdomain) badges.push(`<span class="badge subdomain">${escapeHTML(p.subdomain)}</span>`);
+  if (p.question_type) badges.push(`<span class="badge qtype">${escapeHTML(p.question_type)}</span>`);
+
+  const images = p.images || [];
+  const imgHtml = images.length
+    ? `<div class="images-row">${images.map((src, i) => `
+         <div class="img-container">
+           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="image ${i+1}">
+           <div class="img-label">Image ${i+1}</div>
+         </div>`).join('')}</div>`
+    : '<div class="empty-hint">(no images)</div>';
+
+  const answer = Array.isArray(p.answer) ? p.answer.join(', ') : (p.answer ?? '');
+
+  return `
+  <div class="panel">
+    <div class="panel-header">
+      <span class="id">${escapeHTML(p.id || '')}</span>
+      ${badges.join(' ')}
+      <span style="font-size:11px;color:#888;">ORIGINAL</span>
+    </div>
+    <div class="panel-body">
+      <div class="section-label">Images</div>
+      ${imgHtml}
+      <div class="section-label">Question</div>
+      <div class="question-text">${renderImagePlaceholders(p.question || '', images)}</div>
+      ${renderOptions(p.options, images)}
+      <div class="section-label">Answer</div>
+      <div class="answer-box">${escapeHTML(answer || '(none)')}</div>
+    </div>
+  </div>`;
+}
+
+// ----- Right: Edited Problem + Annotation -----
+function renderRight(p) {
+  const t3 = (p.tier3_questions || [])[0];
+  if (!t3) return `<div class="panel"><div class="panel-body"><div class="empty-hint">No edited question.</div></div></div>`;
+
+  const t3Images = t3.images || [];
+  const imgHtml = t3Images.length
+    ? `<div class="images-row">${t3Images.map((src, i) => `
+         <div class="img-container">
+           <img src="${escapeHTML(src)}" onclick="openLightbox('${escapeHTML(src)}')" alt="edited image ${i+1}">
+           <div class="img-label">Edited Image ${i+1}</div>
+         </div>`).join('')}</div>`
+    : '<div class="empty-hint">(no edited images)</div>';
+
+  const answer = Array.isArray(t3.answer) ? t3.answer.join(', ') : (t3.answer ?? '');
+  const finishedChip = isProblemFinished(p)
+    ? '<span class="finished-chip done">✓ finished</span>'
+    : '<span class="finished-chip">in progress</span>';
+
+  // Annotation
+  const ann = t3.annotation || {};
+  const verdict = ann.verdict || '';
+  const showComments = verdict === 'minor_fix';
+
+  return `
+  <div class="panel">
+    <div class="panel-header">
+      <span class="id">${escapeHTML(t3.question_id || '')}</span>
+      <span class="badge tier">EDITED</span>
+      ${finishedChip}
+    </div>
+    <div class="panel-body">
+      <div class="section-label">Edited Images</div>
+      ${imgHtml}
+      <div class="section-label">Edited Question</div>
+      <div class="question-text">${renderImagePlaceholders(t3.question || '', t3Images)}</div>
+      ${renderOptions(t3.options, t3Images)}
+      <div class="section-label">Edited Answer</div>
+      <div class="answer-box">${escapeHTML(answer || '(none)')}</div>
+
+      <div class="annot-section">
+        <div class="section-label">Annotation</div>
+        <div style="font-size:12px;color:#666;line-height:1.5;margin-bottom:10px;padding:8px 10px;background:#f8f9fa;border-radius:6px;">
+          Compare the edited problem (right) against the original (left). Check whether the edited image, question, options, and answer are faithful and solvable.
+          <br><b>All good</b> — the edit is correct and complete.
+          <b>Needs minor revision</b> — mostly fine but some parts need fixing (describe below).
+          <b>Not reasonable</b> — the edit is fundamentally broken and not easily fixable.
+        </div>
+        <div class="annot-row">
+          <span class="annot-label">Is the edited question reasonable?</span>
+          <label class="label-good"><input type="radio" name="verdict" value="all_good" ${verdict === 'all_good' ? 'checked' : ''}> <span>All good</span></label>
+          <label class="label-minor"><input type="radio" name="verdict" value="minor_fix" ${verdict === 'minor_fix' ? 'checked' : ''}> <span>Needs minor revision</span></label>
+          <label class="label-reject"><input type="radio" name="verdict" value="reject" ${verdict === 'reject' ? 'checked' : ''}> <span>Not reasonable</span></label>
+        </div>
+        <div data-row="comments" style="${showComments ? '' : 'display:none;'}">
+          <div class="comment-block">
+            <div class="comment-label">How to revise the image:</div>
+            <input type="text" class="comment-input" data-field="fix_image" value="${escapeHTML(ann.fix_image || '')}" placeholder="Leave blank if no change needed">
+          </div>
+          <div class="comment-block">
+            <div class="comment-label">How to revise the question:</div>
+            <input type="text" class="comment-input" data-field="fix_question" value="${escapeHTML(ann.fix_question || '')}" placeholder="Leave blank if no change needed">
+          </div>
+          <div class="comment-block">
+            <div class="comment-label">How to revise the options:</div>
+            <input type="text" class="comment-input" data-field="fix_options" value="${escapeHTML(ann.fix_options || '')}" placeholder="Leave blank if no change needed">
+          </div>
+          <div class="comment-block">
+            <div class="comment-label">How to revise the answer:</div>
+            <input type="text" class="comment-input" data-field="fix_answer" value="${escapeHTML(ann.fix_answer || '')}" placeholder="Leave blank if no change needed">
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ========== event wiring ==========
+function bindEvents(p) {
+  const tq = (p.tier3_questions || [])[0];
+  if (!tq) return;
+
+  // Verdict radios
+  document.querySelectorAll('input[name="verdict"]').forEach(el => {
+    el.addEventListener('change', () => {
+      tq.annotation = tq.annotation || {};
+      tq.annotation.verdict = el.value;
+      tq.annotation.annotated_at = nowIso();
+
+      const commentsRow = document.querySelector('[data-row="comments"]');
+      if (el.value === 'minor_fix') {
+        if (commentsRow) commentsRow.style.display = '';
+      } else {
+        if (commentsRow) commentsRow.style.display = 'none';
+        tq.annotation.fix_question = null;
+        tq.annotation.fix_options = null;
+        tq.annotation.fix_image = null;
+        tq.annotation.fix_answer = null;
+      }
+
+      updateFinishedChip(p);
+      renderProgress();
+      scheduleAutosave();
+    });
+  });
+
+  // Comment inputs
+  document.querySelectorAll('.comment-input[data-field]').forEach(el => {
+    el.addEventListener('input', () => {
+      tq.annotation = tq.annotation || {};
+      tq.annotation[el.dataset.field] = el.value;
+      tq.annotation.annotated_at = nowIso();
+      scheduleAutosave();
+    });
+  });
+}
+
+function updateFinishedChip(p) {
+  const chips = document.querySelectorAll('.finished-chip');
+  const done = isProblemFinished(p);
+  chips.forEach(c => {
+    c.className = 'finished-chip' + (done ? ' done' : '');
+    c.textContent = done ? '✓ finished' : 'in progress';
+  });
+}
+
+// ========== navigation ==========
+function go(newIdx) {
+  if (newIdx < 0 || newIdx >= problems.length) return;
+  idx = newIdx;
+  renderAll();
+}
+
+document.getElementById('btnFirst').addEventListener('click', () => go(0));
+document.getElementById('btnPrev').addEventListener('click', () => go(idx - 1));
+document.getElementById('btnNext').addEventListener('click', () => go(idx + 1));
+document.getElementById('btnLast').addEventListener('click', () => go(problems.length - 1));
+document.getElementById('btnNextUnfinished').addEventListener('click', () => {
+  for (let i = 1; i <= problems.length; i++) {
+    const j = (idx + i) % problems.length;
+    if (!isProblemFinished(problems[j])) { go(j); return; }
+  }
+});
+document.getElementById('btnJump').addEventListener('click', () => {
+  const v = parseInt(document.getElementById('jumpInput').value);
+  if (v >= 1 && v <= problems.length) go(v - 1);
+});
+document.getElementById('jumpInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnJump').click();
+});
+
+document.getElementById('btnLoad').addEventListener('click', () => {
+  const name = document.getElementById('fileInput').value.trim();
+  if (name) loadFile(name);
+});
+document.getElementById('btnSave').addEventListener('click', saveCurrent);
+document.getElementById('latexToggle').addEventListener('change', maybeRenderLatex);
+
+// keyboard nav
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'ArrowLeft' || e.key === 'p') go(idx - 1);
+  if (e.key === 'ArrowRight' || e.key === 'n') go(idx + 1);
+  if (e.key === 's' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); saveCurrent(); }
+});
+
+// auto-load from URL param
+const params = new URLSearchParams(location.search);
+const fileParam = params.get('file');
+if (fileParam) {
+  document.getElementById('fileInput').value = fileParam;
+  loadFile(fileParam);
+}
+</script>
+</body>
+</html>

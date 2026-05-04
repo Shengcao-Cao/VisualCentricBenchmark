@@ -66,6 +66,11 @@ def main() -> None:
         required=True,
         help="Output file prefix, e.g. 'needs_review_shard' → '_01.json', '_02.json', …",
     )
+    p.add_argument(
+        "--clean-output",
+        default=None,
+        help="Output path for clean (no-review-needed) items (optional)",
+    )
     args = p.parse_args()
 
     t1 = json.loads(Path(args.tier1).read_text())
@@ -75,6 +80,7 @@ def main() -> None:
     t2_by_key = {_join_key(it): it for it in t2}
 
     problems: list = []
+    clean: list = []
     n_tier1_only = n_tier2_only = n_both = n_skipped = 0
 
     for item in t1:
@@ -94,6 +100,13 @@ def main() -> None:
 
         if not t1_bad and t2_entry is None:
             n_skipped += 1
+            # Collect clean items with all their tier1/tier2 data
+            record = dict(item)
+            if t2_item is not None:
+                record["tier2_questions"] = t2_item["tier2_questions"]
+            else:
+                record["tier2_questions"] = []
+            clean.append(record)
             continue
 
         if t1_bad and t2_entry is not None:
@@ -116,6 +129,17 @@ def main() -> None:
     print(f"  both tiers: {n_both}")
     print(f"  clean (skipped): {n_skipped}")
     print(f"Flagged sub-units: {total_t1_sq} tier1 sub-questions + {total_t2} tier2 entries")
+
+    # Write clean (no-review-needed) items if requested
+    if args.clean_output:
+        clean_path = Path(args.clean_output)
+        clean_path.write_text(json.dumps(clean, indent=2, ensure_ascii=False))
+        clean_t1 = sum(len(p["tier1_questions"]) for p in clean)
+        clean_t2 = sum(len(p["tier2_questions"]) for p in clean)
+        print(
+            f"\nClean items: {len(clean)} problems, "
+            f"{clean_t1} tier1 sub-questions, {clean_t2} tier2 entries  →  {clean_path}"
+        )
 
     n = args.workers
     if n <= 0:

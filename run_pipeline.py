@@ -17,15 +17,21 @@ from pathlib import Path
 
 from client import ClaudeClient, GeminiClient, KimiClient, NovaClient, OpenAIClient, OpenRouterClient, QwenClient
 from tasks.answer import run_answer
+from tasks.answer_tier1 import run_answer_tier1
+from tasks.answer_tier2 import run_answer_tier2
+from tasks.answer_tier3 import run_answer_tier3
 from tasks.caption import run_caption
 from tasks.difficulty import run_difficulty
 from tasks.better_judge import run_better_judge
+from tasks.better_judge_tier2 import run_better_judge_tier2
+from tasks.better_judge_tier3 import run_better_judge_tier3
 from tasks.judge import run_judge
 from tasks.perception import run_perception
 from tasks.prune import run_prune
 from tasks.generate_tier1 import run_generate_tier1
 from tasks.reference_answer_tier1 import run_reference_answer_tier1
 from tasks.structured import run_structured
+from tasks.trivial_tier2 import run_trivial_tier2
 from utils import load_dataset, save_dataset
 
 
@@ -33,7 +39,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "judge", "better_judge", "caption", "difficulty", "perception", "prune", "all", "structured",
+        choices=["answer", "answer_tier1", "answer_tier2", "answer_tier3", "judge", "better_judge", "better_judge_tier2", "better_judge_tier3", "caption", "difficulty", "perception", "prune", "trivial_tier2", "all", "structured",
                  "generate_tier1", "reference_answer_tier1"],
         help="Task to run",
     )
@@ -214,9 +220,48 @@ async def main() -> None:
             for q in qs
         )
 
+    def answer_tier3_skip(item: dict) -> bool:
+        """Skip if this model already has a prediction for the tier3 question."""
+        if not args.skip_existing or item is None:
+            return False
+        qs = item.get("tier3_questions") or []
+        if not qs:
+            return True
+        return model_key in (qs[0].get("predictions") or {})
+
+    def answer_tier2_skip(item: dict) -> bool:
+        """Skip if this model already has a prediction for the tier2 question."""
+        if not args.skip_existing or item is None:
+            return False
+        qs = item.get("tier2_questions") or []
+        if not qs:
+            return True
+        return model_key in (qs[0].get("predictions") or {})
+
+    def answer_tier1_skip(item: dict) -> bool:
+        """Skip if every tier1 sub-question already has a prediction from this model."""
+        if not args.skip_existing or item is None:
+            return False
+        qs = item.get("tier1_questions") or []
+        if not qs:
+            return True
+        return all(
+            model_key in (q.get("predictions") or {})
+            for q in qs
+        )
+
     if args.task == "answer":
         data = await run_answer(data, client, model_key, base_dir, args.concurrency,
                                 skip_fn=make_skip_fn(["answer"]), **common)
+    elif args.task == "answer_tier1":
+        data = await run_answer_tier1(data, client, model_key, base_dir, args.concurrency,
+                                      skip_fn=answer_tier1_skip, **common)
+    elif args.task == "answer_tier2":
+        data = await run_answer_tier2(data, client, model_key, base_dir, args.concurrency,
+                                      skip_fn=answer_tier2_skip, **common)
+    elif args.task == "answer_tier3":
+        data = await run_answer_tier3(data, client, model_key, base_dir, args.concurrency,
+                                      skip_fn=answer_tier3_skip, **common)
     elif args.task == "judge":
         data = await run_judge(data, client, model_key, base_dir, args.concurrency,
                                skip_fn=make_skip_fn(["judge"]), **common)
@@ -242,6 +287,68 @@ async def main() -> None:
             raise ValueError(f"Unsupported judge model: {judge_model}")
         data = await run_better_judge(data, judge_client, model_key, base_dir, args.concurrency,
                                       skip_fn=make_skip_fn(["judge"]), **common)
+    elif args.task == "better_judge_tier2":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+
+        def better_judge_tier2_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier2_questions") or []
+            if not qs:
+                return True
+            return model_key in (qs[0].get("scoring") or {})
+
+        data = await run_better_judge_tier2(data, judge_client, model_key, base_dir, args.concurrency,
+                                             skip_fn=better_judge_tier2_skip, **common)
+    elif args.task == "better_judge_tier3":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+
+        def better_judge_tier3_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier3_questions") or []
+            if not qs:
+                return True
+            return model_key in (qs[0].get("scoring") or {})
+
+        data = await run_better_judge_tier3(data, judge_client, model_key, base_dir, args.concurrency,
+                                             skip_fn=better_judge_tier3_skip, **common)
     elif args.task == "caption":
         data = await run_caption(data, client, model_key, base_dir, args.concurrency,
                                  skip_fn=make_skip_fn(["captions"]), **common)
@@ -254,6 +361,37 @@ async def main() -> None:
     elif args.task == "prune":
         data = await run_prune(data, client, model_key, base_dir, args.concurrency,
                                skip_fn=make_skip_fn(["pruned_question"]), **common)
+    elif args.task == "trivial_tier2":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+
+        def trivial_tier2_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier2_questions") or []
+            if not qs:
+                return True
+            return qs[0].get("trivial") is not None
+
+        data = await run_trivial_tier2(data, judge_client, base_dir, args.concurrency,
+                                        skip_fn=trivial_tier2_skip, **common)
     elif args.task == "structured":
         data = await run_structured(data, client, model_key, base_dir, args.concurrency)
     elif args.task == "generate_tier1":
