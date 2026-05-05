@@ -6,7 +6,7 @@ import os
 from collections import Counter
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PREFIX = "no_review_needed_tier1_"
+PREFIX = "filtered_data_with_solution_hard_tier1+2_clean_tier1_"
 
 MODELS = [
     ("gpt-5.4",                          "gpt_5_4"),
@@ -37,7 +37,7 @@ def load_json(path):
 
 def check_model(model_key, slug):
     """Return stats for a model's tier1 predictions vs majority vote."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}.json")
     if not os.path.exists(path):
         return None
 
@@ -56,10 +56,10 @@ def check_model(model_key, slug):
             continue
         for q in item.get("tier1_questions") or []:
             total_qs += 1
-            majority = (q.get("reference_answers") or {}).get("majority_vote")
+            gt = q.get("gt_answer") or (q.get("reference_answers") or {}).get("majority_vote")
             pred = (q.get("predictions") or {}).get(model_key)
 
-            if not majority:
+            if not gt:
                 no_majority += 1
                 continue
 
@@ -69,7 +69,7 @@ def check_model(model_key, slug):
             if pred:
                 answered += 1
                 by_type[qtype]["total"] += 1
-                if pred == majority:
+                if pred == gt:
                     correct += 1
                     by_type[qtype]["correct"] += 1
             else:
@@ -93,7 +93,7 @@ def main():
         lines.append(s)
 
     # Get total from source file
-    src_path = os.path.join(BASE, "data", "no_review_needed.json")
+    src_path = os.path.join(BASE, "data", "filtered_data_with_solution_hard_tier1+2_clean.json")
     src_data = load_json(src_path)
     total_items = len(src_data)
     total_qs = sum(len(d.get("tier1_questions") or []) for d in src_data)
@@ -102,8 +102,8 @@ def main():
     p()
     p(f"Total items: **{total_items}**, total sub-questions: **{total_qs}**")
     p()
-    p("Accuracy is measured against the majority vote from 3 reference models")
-    p("(gpt-5.4, claude-opus-4-6, gemini-3.1-pro-preview).")
+    p("Accuracy is measured against the ground truth answer (majority vote for")
+    p("unanimous items, human-annotated answer for reviewed items).")
     p()
 
     # --- Overall accuracy ---
@@ -154,7 +154,8 @@ def main():
     p("## Notes")
     p()
     p("- Tier1 questions are simple MCQ (A/B/C/D) about visual perception")
-    p("- No LLM judge needed — direct comparison against majority vote")
+    p("- No LLM judge needed — direct comparison against ground truth")
+    p("- Ground truth: majority vote (unanimous items) or human annotation (reviewed items)")
     p("- Thinking disabled for all models (perception-only, no reasoning required)")
     p(f"- Question type distribution: {', '.join(f'{t} ({TYPE_NAMES[t]})' for t in ('A', 'B', 'C'))}")
 

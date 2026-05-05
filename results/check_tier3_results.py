@@ -52,7 +52,7 @@ def get_tier3_ids():
 
 def check_judged(slug):
     """Return (total, correct, incorrect, parse_errors) from judged file."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -80,7 +80,7 @@ def check_judged(slug):
 
 def check_unreadable(slug):
     """Return set of problem IDs where the model complained about unreadable images."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}.json")
     if not os.path.exists(path):
         return set()
     data = load_json(path)
@@ -100,7 +100,7 @@ def check_unreadable(slug):
 
 def check_original(model_key, slug, tier3_ids):
     """Return {id: correct} for the original judged results, filtered to tier3 IDs."""
-    path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -198,7 +198,7 @@ def main():
             p(f"| {slug} | N/A | N/A | N/A |")
             continue
 
-        tier3_path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
+        tier3_path = os.path.join(BASE, "data", f"{PREFIX}{slug}_judged.json")
         tier3_data = load_json(tier3_path)
         tier3_correct = {}
         for item in tier3_data:

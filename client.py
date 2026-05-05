@@ -180,9 +180,8 @@ class OpenRouterClient(VLMClient):
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,
+            extra_body={"reasoning": {"enabled": reasoning_enabled}},
         )
-        if reasoning_enabled:
-            kwargs["extra_body"] = {"reasoning": {"enabled": True}}
 
         response = await self.client.chat.completions.create(**kwargs)
         msg = response.choices[0].message

@@ -5,7 +5,7 @@ import os
 from collections import Counter
 
 BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PREFIX = "no_review_needed_substantive_tier2_"
+PREFIX = "filtered_data_with_solution_hard_tier1+2_clean_tier2_"
 
 MODELS = [
     ("gpt-5.4",                          "gpt_5_4"),
@@ -28,18 +28,24 @@ def load_json(path):
 
 
 def get_tier2_ids():
-    path = os.path.join(BASE, "data", "no_review_needed_substantive.json")
+    path = os.path.join(BASE, "data", "filtered_data_with_solution_hard_tier1+2_clean.json")
     data = load_json(path)
-    return set(item["id"] for item in data if item is not None)
+    ids = set()
+    for item in data:
+        if item is None:
+            continue
+        if item.get("tier2_questions"):
+            ids.add(item["id"])
+    return ids
 
 
 def check_judged(slug):
     """Return (total, done, correct, incorrect, parse_errors) from judged file."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
-    total = len(data)
+    total = 0
     correct = incorrect = parse_errors = 0
     done = 0
     for item in data:
@@ -48,6 +54,7 @@ def check_judged(slug):
         qs = item.get("tier2_questions") or []
         if not qs:
             continue
+        total += 1
         scoring = qs[0].get("scoring") or {}
         if not scoring:
             continue
@@ -64,7 +71,7 @@ def check_judged(slug):
 
 def check_judged_by_type(slug):
     """Return {question_type: {correct, total}} from judged file."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -89,7 +96,7 @@ def check_judged_by_type(slug):
 
 def get_tier2_correct(slug):
     """Return {id: correct} for tier2 judged results."""
-    path = os.path.join(BASE, "data", "data", f"{PREFIX}{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"{PREFIX}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -109,7 +116,7 @@ def get_tier2_correct(slug):
 
 def get_original_correct(model_key, slug, tier2_ids):
     """Return {id: correct} for original judged results, filtered to tier2 IDs."""
-    path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -155,6 +162,7 @@ def main():
         accuracy_data[slug] = (done, acc)
         status = "" if done == total else f" ({done}/{total})"
         p(f"| {slug} | {total} | {done}{status} | {correct} | {incorrect} | {acc:.1f}% |")
+
 
     p()
 
@@ -209,7 +217,8 @@ def main():
     p()
     p("## Notes")
     p()
-    p(f"- Substantive tier2 problems: {len(tier2_ids)} (after filtering {657} trivial rewrites from {len(tier2_ids)+657})")
+    p(f"- Substantive tier2 problems: {len(tier2_ids)}")
+    p("- Filtered trivial rewrites and non-prunable items; includes human-annotated corrections")
     p("- Tier2 uses pruned questions with original images")
     p("- Judge model: gemini-3.1-flash-lite-preview")
 

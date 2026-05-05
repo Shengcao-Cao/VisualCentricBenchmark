@@ -4,6 +4,9 @@ Input format (tier3_fixed with predictions):
     [{"id": "...", "tier3_questions": [{"question_type", "question", "options", "answer", "images", "predictions": {model: str}}]}]
 
 Stores the judge result under tier3_questions[0]["scoring"][model_key].
+
+Also provides ``run_better_judge_tier3_pruned`` which judges
+``pruned_predictions`` and stores results under ``pruned_scoring``.
 """
 
 import copy
@@ -156,6 +159,78 @@ Model's final answer: {final_answer}"""
         process,
         concurrency=concurrency,
         desc="Judging tier3 (better)",
+        skip_fn=skip_fn,
+        output_path=output_path,
+        save_interval=save_interval,
+    )
+
+
+async def run_better_judge_tier3_pruned(
+    data: list[dict],
+    judge_client: VLMClient,
+    model_key: str,
+    base_dir: str | Path,
+    concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
+) -> list[dict]:
+    """Judge tier3 pruned answers stored under pruned_predictions."""
+    base_dir = Path(base_dir)
+
+    async def process(item: dict) -> dict:
+        item = copy.deepcopy(item)
+        q = item["tier3_questions"][0]
+        model_answer = (q.get("pruned_predictions") or {}).get(model_key)
+
+        if model_answer is None or (isinstance(model_answer, str) and not model_answer.strip()):
+            q.setdefault("pruned_scoring", {})[model_key] = {
+                "correct": False,
+                "reasoning": "No model answer found.",
+            }
+            return item
+
+        gt_answer = _format_gt_answer(q["answer"])
+        q_type = q["question_type"]
+        options = q.get("options")
+        final_answer = _extract_final_answer(model_answer)
+
+        user_text = f"""Question: {q["pruned_question"]}
+{f"Options: {options}" if options else ""}
+Question type: {q_type}
+
+Ground-truth answer: {gt_answer}
+Model's final answer: {final_answer}"""
+
+        content = build_multimodal_content(
+            user_text, q["images"], base_dir, judge_client
+        )
+
+        messages = [
+            {"role": "system", "content": JUDGE_SYSTEM_PROMPT},
+            {"role": "user", "content": content},
+        ]
+
+        last_response = ""
+        for attempt in range(MAX_PARSE_RETRIES):
+            response = await judge_client.chat(messages)
+            last_response = response
+            judge_result = _parse_judge_response(response)
+            if judge_result is not None:
+                q.setdefault("pruned_scoring", {})[model_key] = judge_result
+                return item
+
+        q.setdefault("pruned_scoring", {})[model_key] = {
+            "correct": False,
+            "reasoning": f"Parse error after {MAX_PARSE_RETRIES} retries: {last_response}",
+        }
+        return item
+
+    return await run_batch(
+        data,
+        process,
+        concurrency=concurrency,
+        desc="Judging tier3 pruned (better)",
         skip_fn=skip_fn,
         output_path=output_path,
         save_interval=save_interval,

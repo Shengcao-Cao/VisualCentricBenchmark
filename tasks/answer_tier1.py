@@ -111,10 +111,13 @@ async def run_answer_tier1(
                 letter = _extract_letter(response)
             except Exception as exc:
                 print(f"  [answer_tier1] {q.get('question_id', '?')}: {exc}")
+                response = None
                 letter = None
 
             if letter:
                 preds[model_key] = letter
+            if response is not None:
+                q.setdefault("raw_predictions", {})[model_key] = response
 
         return item
 

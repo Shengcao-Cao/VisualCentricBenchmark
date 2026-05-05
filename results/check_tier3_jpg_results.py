@@ -45,7 +45,7 @@ def load_json(path):
 
 
 def check_judged(prefix, slug, tier_key="tier3_questions"):
-    path = os.path.join(BASE, "data", "data", f"{prefix}{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"{prefix}{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -71,7 +71,7 @@ def check_judged(prefix, slug, tier_key="tier3_questions"):
 
 
 def check_unreadable(prefix, slug, tier_key="tier3_questions"):
-    path = os.path.join(BASE, "data", "data", f"{prefix}{slug}.json")
+    path = os.path.join(BASE, "data", f"{prefix}{slug}.json")
     if not os.path.exists(path):
         return set()
     data = load_json(path)
@@ -90,7 +90,7 @@ def check_unreadable(prefix, slug, tier_key="tier3_questions"):
 
 
 def get_original_correct(model_key, slug, tier3_ids):
-    path = os.path.join(BASE, "data", "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
+    path = os.path.join(BASE, "data", f"filtered_data_with_solution_hard_{slug}_judged.json")
     if not os.path.exists(path):
         return None
     data = load_json(path)
@@ -196,7 +196,7 @@ def main():
         orig_correct = get_original_correct(model_key, slug, tier3_ids)
 
         # JPG correct
-        jpg_path = os.path.join(BASE, "data", "data", f"{PREFIX_JPG}{slug}_judged.json")
+        jpg_path = os.path.join(BASE, "data", f"{PREFIX_JPG}{slug}_judged.json")
         jpg_correct = {}
         if os.path.exists(jpg_path):
             for item in load_json(jpg_path):
@@ -208,7 +208,7 @@ def main():
                         jpg_correct[item["id"]] = r.get("correct", False)
 
         # PNG correct
-        png_path = os.path.join(BASE, "data", "data", f"{PREFIX_PNG}{slug}_judged.json")
+        png_path = os.path.join(BASE, "data", f"{PREFIX_PNG}{slug}_judged.json")
         png_correct = {}
         if os.path.exists(png_path):
             for item in load_json(png_path):

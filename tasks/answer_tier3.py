@@ -4,6 +4,9 @@ Input format (filtered_data_with_solution_hard_tier3_fixed.json):
     [{"id": "...", "tier3_questions": [{"question_type", "question", "options", "images", ...}]}]
 
 Stores the model response under tier3_questions[0]["predictions"][model_key].
+
+Also provides ``run_answer_tier3_pruned`` which uses
+``tier3_questions[0]["pruned_question"]`` instead of ``question``.
 """
 
 import copy
@@ -92,5 +95,58 @@ async def run_answer_tier3(
 
     return await run_batch(
         data, process, concurrency=concurrency, desc="Answering (tier3)",
+        skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
+    )
+
+
+async def run_answer_tier3_pruned(
+    data: list[dict],
+    client: VLMClient,
+    model_key: str,
+    base_dir: str | Path,
+    concurrency: int = 10,
+    skip_fn=None,
+    output_path=None,
+    save_interval: int = 0,
+) -> list[dict]:
+    """Answer tier3 pruned questions using tier3 images."""
+    base_dir = Path(base_dir)
+
+    async def process(item: dict) -> dict:
+        item = copy.deepcopy(item)
+        q = item["tier3_questions"][0]
+
+        q_type = q["question_type"]
+        question_text = q["pruned_question"]
+        options = q.get("options")
+
+        if q_type in ("single_selection", "multiple_selection"):
+            instruction = (
+                SINGLE_SELECTION_INSTRUCTION
+                if q_type == "single_selection"
+                else MULTIPLE_SELECTION_INSTRUCTION
+            )
+            system = SYSTEM_PROMPT_SELECTION.format(selection_instruction=instruction)
+            if options:
+                question_text += "\n\nOptions:\n" + _format_options(options)
+        else:
+            system = SYSTEM_PROMPT_FREE_FORM
+
+        content = build_multimodal_content(
+            question_text, q["images"], base_dir, client
+        )
+
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": content},
+        ]
+
+        response = await client.chat(messages)
+
+        q.setdefault("pruned_predictions", {})[model_key] = response
+        return item
+
+    return await run_batch(
+        data, process, concurrency=concurrency, desc="Answering (tier3 pruned)",
         skip_fn=skip_fn, output_path=output_path, save_interval=save_interval,
     )
