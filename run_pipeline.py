@@ -17,6 +17,8 @@ from pathlib import Path
 
 from client import ClaudeClient, GeminiClient, KimiClient, NovaClient, OpenAIClient, OpenRouterClient, QwenClient
 from tasks.answer import run_answer
+from tasks.answer_ablation import run_answer_ablation, run_answer_tier2_ablation, run_answer_tier2_recovered, run_ablation_judge, run_ablation_judge_tier2
+from tasks.answer_image_quality import run_answer_image_quality
 from tasks.answer_tier1 import run_answer_tier1
 from tasks.answer_tier2 import run_answer_tier2
 from tasks.answer_tier3 import run_answer_tier3, run_answer_tier3_pruned
@@ -39,7 +41,11 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="VLM evaluation pipeline")
     parser.add_argument(
         "task",
-        choices=["answer", "answer_tier1", "answer_tier2", "answer_tier3", "answer_tier3_pruned", "judge", "better_judge", "better_judge_tier2", "better_judge_tier3", "better_judge_tier3_pruned", "caption", "difficulty", "perception", "prune", "trivial_tier2", "all", "structured",
+        choices=["answer", "answer_ablation", "answer_tier2_ablation", "ablation_judge", "ablation_judge_tier2",
+                 "answer_tier2_recovered", "answer_image_quality",
+                 "answer_tier1", "answer_tier2", "answer_tier3", "answer_tier3_pruned",
+                 "judge", "better_judge", "better_judge_tier2", "better_judge_tier3", "better_judge_tier3_pruned",
+                 "caption", "difficulty", "perception", "prune", "trivial_tier2", "all", "structured",
                  "generate_tier1", "reference_answer_tier1"],
         help="Task to run",
     )
@@ -96,6 +102,12 @@ def parse_args() -> argparse.Namespace:
         "--judge-api-key",
         default=None,
         help="API key for the judge model (defaults to --api-key if not set)",
+    )
+    parser.add_argument(
+        "--ablation-mode",
+        choices=["text_only", "text_caption", "text_image_caption"],
+        default=None,
+        help="Ablation mode for answer_ablation / answer_tier2_ablation tasks",
     )
     return parser.parse_args()
 
@@ -262,6 +274,93 @@ async def main() -> None:
     if args.task == "answer":
         data = await run_answer(data, client, model_key, base_dir, args.concurrency,
                                 skip_fn=make_skip_fn(["answer"]), **common)
+    elif args.task == "answer_ablation":
+        if not args.ablation_mode:
+            raise ValueError("--ablation-mode is required for answer_ablation task")
+        data = await run_answer_ablation(data, client, model_key, base_dir, args.ablation_mode,
+                                          args.concurrency, skip_fn=make_skip_fn(["ablation_answer"]), **common)
+    elif args.task == "answer_tier2_ablation":
+        if not args.ablation_mode:
+            raise ValueError("--ablation-mode is required for answer_tier2_ablation task")
+
+        def answer_tier2_ablation_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier2_questions") or []
+            if not qs:
+                return True
+            return model_key in (qs[0].get("ablation_predictions") or {})
+
+        data = await run_answer_tier2_ablation(data, client, model_key, base_dir, args.ablation_mode,
+                                                args.concurrency, skip_fn=answer_tier2_ablation_skip, **common)
+    elif args.task == "ablation_judge":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+        data = await run_ablation_judge(data, judge_client, model_key, base_dir, args.concurrency,
+                                         skip_fn=make_skip_fn(["ablation_judge"]), **common)
+    elif args.task == "ablation_judge_tier2":
+        judge_model = args.judge_model
+        judge_api_key = args.judge_api_key or args.api_key
+        if "gemini" in judge_model.lower() or "gemma" in judge_model.lower():
+            judge_client = GeminiClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "gpt" in judge_model.lower():
+            judge_client = OpenAIClient(
+                model_name=judge_model, api_key=judge_api_key,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        elif "claude" in judge_model.lower():
+            judge_client = ClaudeClient(
+                model_name=judge_model, api_key=judge_api_key, region=args.region,
+                thinking_effort=args.thinking_effort, max_tokens=args.max_tokens,
+            )
+        else:
+            raise ValueError(f"Unsupported judge model: {judge_model}")
+
+        def ablation_judge_tier2_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier2_questions") or []
+            if not qs:
+                return True
+            return model_key in (qs[0].get("ablation_scoring") or {})
+
+        data = await run_ablation_judge_tier2(data, judge_client, model_key, base_dir, args.concurrency,
+                                               skip_fn=ablation_judge_tier2_skip, **common)
+    elif args.task == "answer_tier2_recovered":
+
+        def answer_tier2_recovered_skip(item: dict) -> bool:
+            if not args.skip_existing or item is None:
+                return False
+            qs = item.get("tier2_questions") or []
+            if not qs:
+                return True
+            return model_key in (qs[0].get("ablation_predictions") or {})
+
+        data = await run_answer_tier2_recovered(data, client, model_key, base_dir, args.concurrency,
+                                                  skip_fn=answer_tier2_recovered_skip, **common)
+    elif args.task == "answer_image_quality":
+        data = await run_answer_image_quality(data, client, model_key, base_dir, args.concurrency,
+                                               skip_fn=make_skip_fn(["answer"]), **common)
     elif args.task == "answer_tier1":
         data = await run_answer_tier1(data, client, model_key, base_dir, args.concurrency,
                                       skip_fn=answer_tier1_skip, **common)

@@ -46,8 +46,8 @@ Items flagged by 5+ models (8):
 | MME_Reasoning-train-159 | 5 |
 | MathVision-test-1236 | 5 |
 | EMMA-test-1994 | 5 |
-| Geometry3k-train-951 | 5 |
 | Geometry3k-train-940 | 5 |
+| Geometry3k-train-951 | 5 |
 | EMMA-test-1596 | 5 |
 
 ## Comparison with original images
@@ -58,12 +58,12 @@ Accuracy on the same 313 problems using original images vs tier3 regenerated dia
 |---|---|---|---|
 | gpt_5_4 | 94.2% | 67.7% | -26.5% |
 | gpt_5_4_mini | 72.8% | 59.1% | -13.7% |
-| gemini_3_1_pro_preview | 82.7% | 93.0% | +10.2% |
+| gemini_3_1_pro_preview | 87.9% | 93.0% | +5.1% |
 | gemini_3_1_flash_lite_preview | 62.6% | 75.7% | +13.1% |
 | gemma_4_31b | 76.7% | 80.8% | +4.2% |
 | claude_opus_4_6 | 68.4% | 73.8% | +5.4% |
 | claude_sonnet_4_6 | 64.2% | 76.0% | +11.8% |
-| qwen3_vl_235b_a22b | 35.1% | 55.6% | +20.4% |
+| qwen3_vl_235b_a22b | 39.3% | 55.6% | +16.3% |
 | kimi_k2_5 | 49.8% | 64.2% | +14.4% |
 | nova_2_lite | 13.7% | 34.5% | +20.8% |
 | open_router_qwen3_5_397b_a17b | 84.7% | 74.4% | -10.2% |

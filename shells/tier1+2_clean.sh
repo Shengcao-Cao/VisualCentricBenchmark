@@ -188,6 +188,7 @@ python run_pipeline.py answer_tier2 \
 python run_pipeline.py answer_tier2 \
     -i ${PREFIX}_tier2_kimi_k2_5.json -o ${PREFIX}_tier2_kimi_k2_5.json \
     --model-name moonshotai.kimi-k2.5 \
+    --thinking-effort high \
     --api-key $AWS_BEARER_TOKEN_BEDROCK \
     --region us-east-2 \
     --concurrency 20 --save-interval 20 \

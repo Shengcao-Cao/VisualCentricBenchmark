@@ -488,7 +488,7 @@ class QwenClient(BedrockConverseClient):
         region: str = "us-east-1",
         max_retries: int = 5,
         thinking_effort: str = "none",
-        max_tokens: int = 8000,
+        max_tokens: int = 64000,
     ):
         super().__init__(
             model_name,
@@ -505,6 +505,8 @@ class KimiClient(BedrockConverseClient):
 
     MAX_IMAGE_BYTES = 1_500_000
 
+    _EFFORT_MAP = {"none": None, "low": "low", "medium": "medium", "high": "high"}
+
     def __init__(
         self,
         model_name: str = "moonshotai.kimi-k2.5",
@@ -512,7 +514,7 @@ class KimiClient(BedrockConverseClient):
         region: str = "us-east-1",
         max_retries: int = 5,
         thinking_effort: str = "none",
-        max_tokens: int = 16000,
+        max_tokens: int = 64000,
     ):
         super().__init__(
             model_name,
@@ -522,6 +524,48 @@ class KimiClient(BedrockConverseClient):
             thinking_effort=thinking_effort,
             max_tokens=max_tokens,
         )
+
+    async def _call(
+        self, messages: list[dict], max_tokens: int, temperature: float
+    ) -> str:
+        system_parts = []
+        api_messages = []
+        for msg in messages:
+            if msg["role"] == "system":
+                text = msg["content"] if isinstance(msg["content"], str) else str(msg["content"])
+                system_parts.append({"text": text})
+            else:
+                api_messages.append(self._convert_message(msg))
+
+        effort = self._EFFORT_MAP[self.thinking_effort]
+        kwargs = {
+            "modelId": self.model_name,
+            "messages": api_messages,
+            "inferenceConfig": {"maxTokens": max_tokens, "temperature": temperature},
+        }
+        if system_parts:
+            kwargs["system"] = system_parts
+        if effort:
+            kwargs["additionalModelRequestFields"] = {"reasoning_config": effort}
+
+        response = await asyncio.to_thread(self.client.converse, **kwargs)
+        content_blocks = response["output"]["message"]["content"]
+        parts = []
+        for block in content_blocks:
+            if "reasoningContent" in block:
+                rc = block["reasoningContent"]
+                text = rc.get("reasoningText", {}).get("text", "") if isinstance(rc, dict) else str(rc)
+                if text:
+                    parts.append(text)
+            elif "text" in block:
+                parts.append(block["text"])
+        if not parts:
+            stop = response.get("stopReason", "unknown")
+            raise RuntimeError(
+                f"Kimi response contained no content "
+                f"(stopReason={stop}). Try increasing max_tokens."
+            )
+        return "\n\n".join(parts)
 
 
 class NovaClient(BedrockConverseClient):

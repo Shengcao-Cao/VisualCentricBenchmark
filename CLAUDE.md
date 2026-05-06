@@ -32,6 +32,7 @@ coreset/
 │   ├── tier3_figures/     # Tier3 PNG images (transparent background - deprecated)
 │   ├── tier3_figures_jpg/ # Tier3 JPG images (white background - use these)
 │   ├── chemistry_figures_jpg/  # Chemistry JPG images
+│   ├── physics_figures_jpg/    # Physics tier3 JPG images
 │   └── *.json             # All data files (see Data Files section)
 ├── scripts/               # Data processing scripts
 │   ├── fix_tier1.py       # Fix tier1 schema (image_index, question_id)
@@ -40,6 +41,10 @@ coreset/
 │   ├── fix_tier3_jpg.py   # Fix tier3 → JPG (white background, no transparency)
 │   ├── fix_tier3_jpg_pruned.py  # Fix tier3+pruned (merge original + tier3 + pruned)
 │   ├── fix_chemistry_jpg.py     # Fix chemistry data → JPG
+│   ├── fix_physics_jpg.py       # Fix physics data → JPG (skip multi-image)
+│   ├── translate_chemistry.py   # Translate Chinese chemistry items to English (Gemini)
+│   ├── consolidate_physics.py   # Consolidate physics tier3 (filter both-fail, fix qt)
+│   ├── consolidate_tier3_physics.py  # Merge physics pruned data for annotation
 │   ├── filter_trivial_tier2.py  # Remove trivial tier2 problems
 │   ├── filter_needs_review_split.py  # Split needs-review into shards
 │   ├── filter_tier1_needs_review.py  # Flag tier1 disagreements
@@ -57,6 +62,7 @@ coreset/
 │   ├── tier1+2_clean.sh   # Tier1+2 inference + judging on clean full dataset
 │   ├── tier3.sh           # Tier3 inference + judging (JPG images)
 │   ├── tier3_2.sh         # Tier3_2 inference + judging (pruned questions)
+│   ├── tier3_physics.sh   # Tier3 physics inference + judging (regenerated diagrams)
 │   ├── eval_hard.sh       # Tier0 inference + judging
 │   ├── judge.sh           # Re-judge all tier0 with better_judge
 │   ├── trivial_tier2.sh   # Run trivial detection + filtering
@@ -77,7 +83,10 @@ coreset/
 │   ├── check_tier3_results.py      # Generate tier3_results.md (PNG)
 │   ├── check_tier3_jpg_results.py  # Generate tier3_jpg_results.md (JPG)
 │   ├── check_tier3_2_results.py    # Generate tier3_2_results.md (edited+pruned)
-│   └── tier*_results.md            # Markdown result reports
+│   ├── tier*_results.md            # Markdown result reports
+│   ├── t1_correlation/             # T1 perception → reasoning correlation analysis
+│   ├── per_source_analysis/        # Per-source-dataset T0 vs T3_2 analysis
+│   └── pruning_ratio/              # Pruning ratio vs accuracy drop analysis
 ├── logs/                  # All inference/judging log files
 └── visualizations/        # Distribution plots, dedup visualizations
 ```
@@ -91,6 +100,8 @@ coreset/
 | **Tier 2** | Image reliance (pruned text) | Original images | Pruned question (textual cues removed) |
 | **Tier 3** | Diagram formalization | Regenerated JPG diagrams | Edited question for new diagram |
 | **Tier 3_2** | Diagram formalization + pruning | Regenerated JPG diagrams | Pruned version of tier3 edited question |
+| **Tier 3 Physics** | Physics diagram formalization | Regenerated JPG diagrams (matplotlib/tikz/circuitikz) | Edited physics question for new diagram |
+| **Tier 3_2 Physics** | Physics formalization + pruning | Regenerated JPG diagrams | Pruned version of physics tier3 edited question |
 
 ## Models (11 total)
 
@@ -118,6 +129,18 @@ All in `data/`. Key files:
 - `filtered_data_with_solution_hard_tier2_fixed.json` — tier2 pruned questions (2,615)
 - `filtered_data_with_solution_hard_tier3_fixed_jpg.json` — 313 tier3 problems (JPG)
 - `filtered_data_with_solution_hard_tier3_2.json` — 283 tier3_2 problems (consolidated, filtered, pruned)
+
+### Physics tier3
+- `physics_approved.json` — 226 raw physics tier3 tasks (SVG + edited questions, all engines)
+- `physics_approved_fixed.json` — 183 items after fix_physics_jpg (multi-image skipped)
+- `filtered_data_with_solution_hard_tier3_physics.json` — 159 items (both-fail filtered, qt-fixed)
+- `filtered_data_with_solution_hard_tier3_2_physics.json` — 158 items (pruned, for annotation)
+- `tier3_physics_ver1_revised_stage4_gpt-5.4_10000.json` — raw model-pruned output (158 items)
+
+### Chemistry tier3
+- `chemistry_unreviewed_fixed.json` — 102 chemistry tier3 items (JPG images)
+- `chemistry_unreviewed_fixed_chinese.json` — 54 Chinese-language subset
+- `chemistry_unreviewed_fixed_chinese_translated.json` — above translated to English
 
 ### Annotation split (old)
 - `no_review_needed.json` — 1,035 clean tier1/tier2 problems (no annotation flags)
@@ -218,16 +241,53 @@ python scripts/fix_tier3_jpg.py -i data/filtered_data_with_solution_hard_tier3.j
 
 # Consolidate tier3 pruned annotations → tier3_2
 python scripts/consolidate_tier3_pruned.py -o data/filtered_data_with_solution_hard_tier3_2.json
+
+# Physics pipeline: approved → JPG → filtered → pruned for annotation
+python scripts/fix_physics_jpg.py -i data/physics_approved.json -o data/physics_approved_fixed.json
+python scripts/consolidate_physics.py  # → filtered_data_with_solution_hard_tier3_physics.json (159 items)
+python scripts/consolidate_tier3_physics.py  # → filtered_data_with_solution_hard_tier3_2_physics.json (158 items, for annotation)
+
+# Translate Chinese chemistry items
+python scripts/translate_chemistry.py -i data/chemistry_unreviewed_fixed_chinese.json -o data/chemistry_unreviewed_fixed_chinese_translated.json
 ```
 
 ## Known Issues
 
+- **Physics tier3 multi-image**: 43/226 physics problems have multiple original images but only 1 SVG is generated per task. These are skipped in `fix_physics_jpg.py`.
+- **Physics tier3 performance**: Models score *higher* on regenerated physics diagrams than originals (e.g. Flash-Lite +20%, Qwen3-VL +19%), suggesting clean renders are easier to parse than scanned/hand-drawn originals.
 - **Tier3 PNG transparency**: 312/313 tier3 PNGs have transparent backgrounds (RGBA). Models (especially GPT, Qwen) render transparent regions as black and claim images are blank. Use JPG versions (`tier3_figures_jpg/`) instead.
 - **OpenRouter Qwen3.5 reasoning default**: OpenRouter enables reasoning by default for Qwen3.5-397B even without `reasoning.enabled` param. The `OpenRouterClient` now explicitly passes `{"reasoning": {"enabled": False}}` when `thinking_effort="none"`. Old T1 results for this model (run before 2026-05-04) had reasoning inadvertently enabled and were re-run.
-- **Bedrock Converse thinking_effort**: The `BedrockConverseClient` does not pass `thinking_effort` to the Converse API. Qwen3-VL, Kimi K2.5, and Nova 2 Lite always use their default behavior. Kimi K2.5 supports `reasoning_config` as a flat string via `additionalModelRequestFields` (e.g., `{"reasoning_config": "high"}`) but this is not currently wired in.
+- **Bedrock Converse thinking_effort**: The `BedrockConverseClient` does not pass `thinking_effort` to the Converse API. Qwen3-VL and Nova 2 Lite always use their default behavior. `KimiClient` passes `reasoning_config` via `additionalModelRequestFields` when `thinking_effort != "none"`.
 - **better_judge_tier2 on full dataset**: The judge crashes with `IndexError` on items without T2 entries (`tier2_questions: []`). The errors are logged but harmless — items with T2 are still judged correctly. Affects runs on the 2,711-item clean file (1,676 items have no T2).
 - **Gemma rate limits**: 30 RPM limit on Gemma-4-31B causes many tier1 sub-questions to fail after 5 retries. Re-run with `--skip-existing` and lower concurrency (`--concurrency 10`).
 - **Gemini-3.1-Pro T0 variance**: Original T0 run scored 70.3%; rerun scored 75.2% (+4.9pp). The rerun is now the canonical file.
+
+## Analysis Experiments
+
+### T1 Perception → Reasoning Correlation
+- `results/t1_correlation/t1_correlation.py` → `t1_correlation_binned.{pdf,png}`, `t1_correlation_scatter.{pdf,png}`, `t1_correlation.md`
+- Correlates T1 perception scores with original/T2 reasoning accuracy. Per-problem correlation is near zero; model-level correlation is moderate (r≈0.7).
+
+### Per-Source-Dataset Analysis
+- `results/per_source_analysis/per_source_analysis.py` → `per_source_analysis.md`
+- Reports T0 vs T3_2 accuracy grouped by source benchmark (OlympiadBench, Geometry3k, etc.).
+
+### Pruning Ratio Analysis
+- `results/pruning_ratio/pruning_ratio.py` → `pruning_ratio.{pdf,png}`, `pruning_ratio.md`
+- Stratifies T2 problems by char-based pruning ratio and measures accuracy drop. Heavier pruning → larger drops.
+
+### Image Quality Effect
+- `tasks/answer_image_quality.py`, `shells/image_quality.sh`, `results/image_quality/`
+- Original text + reproduced T3 image. Inference + judging done for all 10 models.
+- Original `image_equivalence` annotation had 144 "equivalent" items, but manual review found 42 were not truly equivalent (some had edited problem text baked into the reproduced image, others had different diagram content). Annotation UI: `annotation/annotate_image_quality.py`.
+- Corrected labels saved back to `data/filtered_data_with_solution_hard_tier3_2.json` (now 102 equivalent, 181 edited). Analysis uses `data/image_quality_equiv_subset_corrected.json` (102 items).
+- Results: on the corrected 102-item subset, reproduced images cause a small average drop (B−A ≈ −1.6 pp), likely within noise. The image swap itself is not a major factor.
+
+### Ablation Experiments (text-only / caption / image+caption)
+- `tasks/answer_ablation.py`, `shells/ablation.sh`
+- New pipeline tasks: `answer_ablation`, `answer_tier2_ablation`, `ablation_judge`, `ablation_judge_tier2` (use `--ablation-mode` flag)
+- Three modes: `text_only`, `text_caption`, `text_image_caption`. Runs on T0 and T2 for GPT-5.4, Gemini 3.1 Pro, Qwen3.5-397B.
+- Data: `data/ablation_subset_200.json` (200-item subset of T2 items)
 
 ## Environment
 

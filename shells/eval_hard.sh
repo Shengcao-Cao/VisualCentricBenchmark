@@ -143,6 +143,7 @@ python run_pipeline.py judge \
 python run_pipeline.py answer \
     -i data/filtered_data_with_solution_hard.json -o data/filtered_data_with_solution_hard_kimi_k2_5.json \
     --model-name moonshotai.kimi-k2.5 \
+    --thinking-effort high \
     --api-key $AWS_BEARER_TOKEN_BEDROCK \
     --region us-east-2 \
     --concurrency 20 --save-interval 20 \

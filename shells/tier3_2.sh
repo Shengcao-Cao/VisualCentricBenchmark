@@ -79,6 +79,7 @@ python run_pipeline.py answer_tier3_pruned \
 python run_pipeline.py answer_tier3_pruned \
     -i $INPUT -o ${PREFIX}_kimi_k2_5.json \
     --model-name moonshotai.kimi-k2.5 \
+    --thinking-effort high \
     --api-key $AWS_BEARER_TOKEN_BEDROCK \
     --region us-east-2 \
     --concurrency 20 --save-interval 20 \
