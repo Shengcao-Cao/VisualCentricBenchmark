@@ -147,16 +147,16 @@ If problems from older, widely-distributed benchmarks (e.g., Geometry3k, Olympia
 
 | Source | Orig (%) | T3 (%) | Δ (pp) |
 |--------|--------:|------:|-------:|
-| Geometry3k | 42.2 | 42.2 | +0.0 |
-| MathVerse | 45.7 | 77.1 | +31.4 |
-| MathVision | 60.7 | 57.1 | -3.6 |
+| Geometry3k | 65.6 | 71.9 | +6.2 |
+| MathVerse | 60.0 | 80.0 | +20.0 |
+| MathVision | 70.2 | 70.2 | +0.0 |
 | MathVista | 100.0 | 0.0 | -100.0 |
-| OlympiadBench | 62.2 | 62.2 | +0.0 |
-| OlympicArena | 0.0 | 25.0 | +25.0 |
-| MMMU | 33.3 | 22.2 | -11.1 |
-| EMMA | 44.8 | 34.5 | -10.3 |
+| OlympiadBench | 84.4 | 73.3 | -11.1 |
+| OlympicArena | 75.0 | 75.0 | +0.0 |
+| MMMU | 44.4 | 55.6 | +11.1 |
+| EMMA | 55.2 | 58.6 | +3.4 |
 | MME_Reasoning | 80.0 | 60.0 | -20.0 |
-| HumanityLastExam | 20.0 | 40.0 | +20.0 |
+| HumanityLastExam | 40.0 | 60.0 | +20.0 |
 
 ### Qwen3.5-397B-A17B
 
@@ -177,16 +177,16 @@ If problems from older, widely-distributed benchmarks (e.g., Geometry3k, Olympia
 
 | Source | Count | Orig (%) | T3 (%) | Δ (pp) |
 |--------|------:|--------:|------:|-------:|
-| Geometry3k | 64 | 69.2 | 69.7 | +0.5 |
-| MathVerse | 35 | 65.4 | 78.9 | +13.4 |
-| MathVision | 84 | 74.5 | 69.3 | -5.2 |
+| Geometry3k | 64 | 71.6 | 72.7 | +1.1 |
+| MathVerse | 35 | 66.9 | 79.1 | +12.3 |
+| MathVision | 84 | 75.5 | 70.6 | -4.9 |
 | MathVista | 3 | 53.3 | 46.7 | -6.7 |
-| OlympiadBench | 45 | 80.7 | 72.7 | -8.0 |
-| OlympicArena | 4 | 77.5 | 70.0 | -7.5 |
-| MMMU | 9 | 78.9 | 75.6 | -3.3 |
-| EMMA | 29 | 64.1 | 57.6 | -6.6 |
+| OlympiadBench | 45 | 82.9 | 73.8 | -9.1 |
+| OlympicArena | 4 | 85.0 | 75.0 | -10.0 |
+| MMMU | 9 | 80.0 | 78.9 | -1.1 |
+| EMMA | 29 | 65.2 | 60.0 | -5.2 |
 | MME_Reasoning | 5 | 80.0 | 66.0 | -14.0 |
-| HumanityLastExam | 5 | 66.0 | 62.0 | -4.0 |
+| HumanityLastExam | 5 | 68.0 | 64.0 | -4.0 |
 
 ## Compact Table: Δ (T3 − Orig) by Model and Source
 
@@ -200,9 +200,9 @@ If problems from older, widely-distributed benchmarks (e.g., Geometry3k, Olympia
 | Claude Opus 4.6 | -6.2 | +14.3 | -15.5 | +0.0 | -13.3 | -50.0 | +11.1 | -17.2 | -20.0 | +20.0 | -7.7 |
 | Claude Sonnet 4.6 | +4.7 | +22.9 | -4.8 | +33.3 | -6.7 | +0.0 | -11.1 | -6.9 | +0.0 | -20.0 | +1.1 |
 | Qwen3-VL-235B-A22B | +10.9 | +20.0 | +15.5 | +0.0 | -11.1 | +0.0 | -11.1 | +3.4 | +20.0 | -40.0 | +0.8 |
-| Kimi K2.5 | +0.0 | +31.4 | -3.6 | -100.0 | +0.0 | +25.0 | -11.1 | -10.3 | -20.0 | +20.0 | -6.9 |
+| Kimi K2.5 | +6.2 | +20.0 | +0.0 | -100.0 | -11.1 | +0.0 | +11.1 | +3.4 | -20.0 | +20.0 | -7.0 |
 | Qwen3.5-397B-A17B | -1.6 | +8.6 | -4.8 | -33.3 | -15.6 | -25.0 | +0.0 | +3.4 | +0.0 | +20.0 | -4.8 |
-| **Average** | +0.5 | +13.4 | -5.2 | -6.7 | -8.0 | -7.5 | -3.3 | -6.6 | -14.0 | -4.0 | -4.1 |
+| **Average** | +1.1 | +12.3 | -4.9 | -6.7 | -9.1 | -10.0 | -1.1 | -5.2 | -14.0 | -4.0 | -4.2 |
 
 ## How to Reproduce
 

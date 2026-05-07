@@ -2,7 +2,7 @@
 # Ablation experiments: text-only, text+caption, text+image+caption
 # on original (T0) and pruned (T2) questions.
 # 200-item subset of T2 problems.
-# Models: GPT-5.4, Gemini 3.1 Pro, Qwen3.5-397B
+# Models: GPT-5.4, Gemini 3.1 Pro, Qwen3.5-397B, Kimi K2.5
 
 set -e
 
@@ -92,7 +92,35 @@ for MODE in text_only text_caption text_image_caption; do
 done
 
 # ──────────────────────────────────────────────────────────
-# T2 Recovered question + original image (all 3 models)
+# Kimi K2.5 (Bedrock)
+# ──────────────────────────────────────────────────────────
+
+for MODE in text_only text_caption text_image_caption; do
+    python run_pipeline.py answer_ablation \
+        -i ${INPUT} -o ${PREFIX}_t0_${MODE}_kimi_k2_5.json \
+        --model-name moonshotai.kimi-k2.5 \
+        --ablation-mode ${MODE} \
+        --thinking-effort high \
+        --api-key $AWS_BEARER_TOKEN_BEDROCK \
+        --region us-east-2 \
+        --concurrency 50 --save-interval 50 \
+        --skip-existing \
+        > logs/ablation_t0_${MODE}_kimi_k2_5.log 2>&1
+
+    python run_pipeline.py answer_tier2_ablation \
+        -i ${INPUT} -o ${PREFIX}_t2_${MODE}_kimi_k2_5.json \
+        --model-name moonshotai.kimi-k2.5 \
+        --ablation-mode ${MODE} \
+        --thinking-effort high \
+        --api-key $AWS_BEARER_TOKEN_BEDROCK \
+        --region us-east-2 \
+        --concurrency 50 --save-interval 50 \
+        --skip-existing \
+        > logs/ablation_t2_${MODE}_kimi_k2_5.log 2>&1
+done
+
+# ──────────────────────────────────────────────────────────
+# T2 Recovered question + original image
 # ──────────────────────────────────────────────────────────
 
 python run_pipeline.py answer_tier2_recovered \
@@ -123,17 +151,29 @@ python run_pipeline.py answer_tier2_recovered \
     --skip-existing \
     > logs/ablation_t2_recovered_open_router_qwen3_5_397b_a17b.log 2>&1
 
+python run_pipeline.py answer_tier2_recovered \
+    -i ${INPUT} -o ${PREFIX}_t2_recovered_kimi_k2_5.json \
+    --model-name moonshotai.kimi-k2.5 \
+    --thinking-effort high \
+    --api-key $AWS_BEARER_TOKEN_BEDROCK \
+    --region us-east-2 \
+    --concurrency 50 --save-interval 50 \
+    --skip-existing \
+    > logs/ablation_t2_recovered_kimi_k2_5.log 2>&1
+
 # ──────────────────────────────────────────────────────────
 # Judging (all ablation outputs)
 # ──────────────────────────────────────────────────────────
 
-for MODEL_SLUG in gpt_5_4 gemini_3_1_pro_preview open_router_qwen3_5_397b_a17b; do
+for MODEL_SLUG in gpt_5_4 gemini_3_1_pro_preview open_router_qwen3_5_397b_a17b kimi_k2_5; do
     if [ "$MODEL_SLUG" = "gpt_5_4" ]; then
         MODEL_NAME="gpt-5.4"
     elif [ "$MODEL_SLUG" = "gemini_3_1_pro_preview" ]; then
         MODEL_NAME="gemini-3.1-pro-preview"
     elif [ "$MODEL_SLUG" = "open_router_qwen3_5_397b_a17b" ]; then
         MODEL_NAME="qwen/qwen3.5-397b-a17b"
+    elif [ "$MODEL_SLUG" = "kimi_k2_5" ]; then
+        MODEL_NAME="moonshotai.kimi-k2.5"
     fi
 
     for MODE in text_only text_caption text_image_caption; do

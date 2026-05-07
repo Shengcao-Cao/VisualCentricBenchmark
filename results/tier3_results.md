@@ -64,7 +64,7 @@ Accuracy on the same 313 problems using original images vs tier3 regenerated dia
 | claude_opus_4_6 | 68.4% | 73.8% | +5.4% |
 | claude_sonnet_4_6 | 64.2% | 76.0% | +11.8% |
 | qwen3_vl_235b_a22b | 39.3% | 55.6% | +16.3% |
-| kimi_k2_5 | 49.8% | 64.2% | +14.4% |
+| kimi_k2_5 | 66.8% | 64.2% | -2.6% |
 | nova_2_lite | 13.7% | 34.5% | +20.8% |
 | open_router_qwen3_5_397b_a17b | 84.7% | 74.4% | -10.2% |
 

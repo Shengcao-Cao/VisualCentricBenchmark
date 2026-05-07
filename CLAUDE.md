@@ -259,6 +259,8 @@ python scripts/translate_chemistry.py -i data/chemistry_unreviewed_fixed_chinese
 - **OpenRouter Qwen3.5 reasoning default**: OpenRouter enables reasoning by default for Qwen3.5-397B even without `reasoning.enabled` param. The `OpenRouterClient` now explicitly passes `{"reasoning": {"enabled": False}}` when `thinking_effort="none"`. Old T1 results for this model (run before 2026-05-04) had reasoning inadvertently enabled and were re-run.
 - **Bedrock Converse thinking_effort**: The `BedrockConverseClient` does not pass `thinking_effort` to the Converse API. Qwen3-VL and Nova 2 Lite always use their default behavior. `KimiClient` passes `reasoning_config` via `additionalModelRequestFields` when `thinking_effort != "none"`.
 - **better_judge_tier2 on full dataset**: The judge crashes with `IndexError` on items without T2 entries (`tier2_questions: []`). The errors are logged but harmless — items with T2 are still judged correctly. Affects runs on the 2,711-item clean file (1,676 items have no T2).
+- **Kimi K2.5 rerun with thinking**: Kimi T0/T2/T3_2 were rerun with `--thinking-effort high` (reasoning enabled). Old results (no thinking) preserved as `*_kimi_k2_5_old*.json`. Canonical files now use thinking.
+- **Qwen3-VL rerun without token cap**: Qwen T0/T2/T3_2 were rerun without the 8000 max_tokens cap that truncated long answers. Old results preserved as `*_qwen3_vl_235b_a22b_old*.json`. Canonical files now use default max_tokens.
 - **Gemma rate limits**: 30 RPM limit on Gemma-4-31B causes many tier1 sub-questions to fail after 5 retries. Re-run with `--skip-existing` and lower concurrency (`--concurrency 10`).
 - **Gemini-3.1-Pro T0 variance**: Original T0 run scored 70.3%; rerun scored 75.2% (+4.9pp). The rerun is now the canonical file.
 

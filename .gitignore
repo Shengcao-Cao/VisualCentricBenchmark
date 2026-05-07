@@ -7,6 +7,7 @@
 *.log
 .DS_Store
 ./playground/
+results/teaser/
 
 # Python
 __pycache__/
