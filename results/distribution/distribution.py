@@ -12,8 +12,8 @@ DATA_PATH = Path(__file__).resolve().parent.parent.parent / "data" / "filtered_d
 OUT_DIR = Path(__file__).resolve().parent
 
 BG_COLOR = "#FFFFFF"
-LABEL_SIZE = 10
-PCT_SIZE = 9
+LABEL_SIZE = 9
+PCT_SIZE = 8
 
 DOMAIN_COLORS = {
     "Math": "#4C72B0",
@@ -41,8 +41,11 @@ QTYPE_LABELS = {
 }
 
 
-def make_pie(ax, labels, sizes, colors, min_pct=4.0):
+def make_pie(ax, labels, sizes, colors, min_pct=4.0, label_offsets=None):
+    """label_offsets: dict mapping label -> angle offset in degrees for the outside text."""
     total = sum(sizes)
+    if label_offsets is None:
+        label_offsets = {}
     wedges, _ = ax.pie(
         sizes,
         labels=None,
@@ -56,10 +59,12 @@ def make_pie(ax, labels, sizes, colors, min_pct=4.0):
         if pct < min_pct:
             continue
         ang = (wedge.theta2 + wedge.theta1) / 2
+        label_ang = ang + label_offsets.get(label, 0)
         rad = np.deg2rad(ang)
-        # label outside, percentage inside
-        x_out = 1.18 * np.cos(rad)
-        y_out = 1.18 * np.sin(rad)
+        label_rad = np.deg2rad(label_ang)
+        # label outside (use adjusted angle), percentage inside (use true angle)
+        x_out = 1.18 * np.cos(label_rad)
+        y_out = 1.18 * np.sin(label_rad)
         ha = "left" if x_out >= 0 else "right"
         ax.text(
             x_out, y_out, f"{label}\n({size:,})",
@@ -82,21 +87,22 @@ def main():
     domains = Counter(it["domain"] for it in items)
     qtypes = Counter(it["question_type"] for it in items)
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5.2))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(5.5, 2.4))
     fig.patch.set_facecolor(BG_COLOR)
 
     # Left: domain
     dom_labels = [d for d in DOMAIN_ORDER if d in domains]
     dom_sizes = [domains[d] for d in dom_labels]
     dom_colors = [DOMAIN_COLORS[d] for d in dom_labels]
-    make_pie(ax1, dom_labels, dom_sizes, dom_colors)
-
+    make_pie(ax1, dom_labels, dom_sizes, dom_colors,
+             label_offsets={"Biology": 0, "Geography": 10})
     # Right: question type
     qt_labels_raw = [q for q in QTYPE_ORDER if q in qtypes]
     qt_sizes = [qtypes[q] for q in qt_labels_raw]
     qt_colors = [QTYPE_COLORS[q] for q in qt_labels_raw]
     qt_labels = [QTYPE_LABELS[q] for q in qt_labels_raw]
-    make_pie(ax2, qt_labels, qt_sizes, qt_colors)
+    make_pie(ax2, qt_labels, qt_sizes, qt_colors,
+             label_offsets={"Free-form": 30})
 
     fig.subplots_adjust(wspace=0.3)
 

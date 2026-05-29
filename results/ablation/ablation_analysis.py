@@ -162,13 +162,13 @@ def main():
     # ── Styling ──
     plt.rcParams.update({
         "font.family": "sans-serif",
-        "font.size": 10,
+        "font.size": 11,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "axes.linewidth": 0.6,
     })
 
-    FIG_HEIGHT = 3.5
+    FIG_HEIGHT = 4.0
 
     # Per-model base colors with alpha progression (lighter = less info, darker = more info)
     from matplotlib.colors import to_rgba
@@ -190,7 +190,7 @@ def main():
     t2_settings = ["text_only", "text_caption", "canonical", "text_image_caption", "recovered"]
     bar_labels = [label for _, _, label, _ in MODELS] + [AVG_LABEL]
 
-    fig, (ax0, ax2) = plt.subplots(1, 2, figsize=(13, FIG_HEIGHT), sharey=True,
+    fig, (ax0, ax2) = plt.subplots(1, 2, figsize=(11, FIG_HEIGHT), sharey=True,
                                     gridspec_kw={"width_ratios": [4, 5]})
 
     for ax, tier, settings, title, alphas in [
@@ -214,7 +214,7 @@ def main():
                           linewidth=0.5)
             for bar, val in zip(bars, vals):
                 ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.4,
-                        f"{val:.0f}", ha="center", va="bottom", fontsize=6, fontweight="medium",
+                        f"{val:.0f}", ha="center", va="bottom", fontsize=8, fontweight="medium",
                         color="#333333")
 
         # Canonical baseline dashed line (average only)
@@ -223,14 +223,14 @@ def main():
 
         xlabels = [MODE_LABELS[s] for s in settings]
         ax.set_xticks(x)
-        ax.set_xticklabels(xlabels, fontsize=8)
-        ax.set_title(title, fontsize=10.5, fontweight="medium", pad=6)
+        ax.set_xticklabels(xlabels, fontsize=10)
+        ax.set_title(title, fontsize=14, fontweight="medium", pad=6)
         if ax is ax0:
-            ax.set_ylabel("Accuracy (%)", fontsize=9.5)
+            ax.set_ylabel("Accuracy (%)", fontsize=12)
         ax.set_ylim(0, 100)
         ax.yaxis.set_major_locator(mticker.MultipleLocator(20))
         ax.grid(axis="y", alpha=0.12, linewidth=0.4)
-        ax.tick_params(axis="both", labelsize=8)
+        ax.tick_params(axis="both", labelsize=10)
 
     # Legend: one entry per model (using darkest alpha)
     import matplotlib.patches as mpatches
@@ -238,7 +238,7 @@ def main():
     for label in bar_labels:
         legend_handles.append(mpatches.Patch(facecolor=model_colors[label], edgecolor="white",
                                              linewidth=0.5, label=label))
-    ax0.legend(handles=legend_handles, fontsize=7.5, loc="upper left", frameon=True,
+    ax0.legend(handles=legend_handles, fontsize=10, loc="lower left", frameon=True,
                edgecolor="#dddddd", fancybox=False, handletextpad=0.4, borderpad=0.5)
 
     fig.tight_layout(w_pad=2)

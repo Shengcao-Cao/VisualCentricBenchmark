@@ -35,9 +35,9 @@ LEGEND_ORDER = [
 ]
 
 T1_BINS = [
-    (-0.001, 1/3 + 0.001, "[0, 1/3]"),
-    (1/3 + 0.001, 2/3 + 0.001, "(1/3, 2/3]"),
-    (2/3 + 0.001, 1.001,       "(2/3, 1]"),
+    (-0.001, 1/3 + 0.001, "[0,1/3]"),
+    (1/3 + 0.001, 2/3 + 0.001, "(1/3,2/3]"),
+    (2/3 + 0.001, 1.001,       "(2/3,1]"),
 ]
 
 
@@ -155,7 +155,7 @@ def main():
     # ── Styling ──
     plt.rcParams.update({
         "font.family": "sans-serif",
-        "font.size": 12,
+        "font.size": 11,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "axes.linewidth": 0.6,
@@ -165,7 +165,7 @@ def main():
     FIG_HEIGHT = 3.6
 
     # ── Figure 1: Binned bar chart (pooled across models) ──
-    fig, axes = plt.subplots(1, 2, figsize=(7, FIG_HEIGHT), sharey=True)
+    fig, axes = plt.subplots(1, 2, figsize=(4.2, FIG_HEIGHT), sharey=True)
     tier_names = ["Original Problem", "Tier 2 (Pruned)"]
     tier_keys = ["t0", "t2"]
 
@@ -178,52 +178,52 @@ def main():
             bin_ns.append(len(vals))
 
         x = np.arange(len(T1_BINS))
-        bars = ax.bar(x, bin_accs, width=0.55, color=bar_colors, edgecolor="white", linewidth=0.8)
+        bars = ax.bar(x, bin_accs, width=0.55, color=bar_colors, edgecolor="white", linewidth=0.6)
         for bar, acc in zip(bars, bin_accs):
             ax.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 0.8,
                     f"{acc:.1f}", ha="center", va="bottom", fontsize=10, fontweight="medium")
 
         xlabels = [b[2] for b in T1_BINS]
         ax.set_xticks(x)
-        ax.set_xticklabels(xlabels, fontsize=11)
-        ax.set_title(tname, fontsize=12, fontweight="medium", pad=6)
+        ax.set_xticklabels(xlabels, fontsize=10)
+        ax.set_title(tname, fontsize=12, fontweight="medium", pad=4)
         ax.set_ylim(0, 72)
-        ax.set_xlabel("Tier 1 Accuracy", fontsize=12)
+        ax.set_xlabel("Tier 1 Accuracy", fontsize=11)
         if ax is axes[0]:
-            ax.set_ylabel("Accuracy (%)", fontsize=12)
+            ax.set_ylabel("Accuracy (%)", fontsize=11)
         ax.yaxis.set_major_locator(mticker.MultipleLocator(10))
         ax.grid(axis="y", alpha=0.15, linewidth=0.4)
         ax.tick_params(axis="both", labelsize=10)
 
-    fig.tight_layout(w_pad=1.5)
+    fig.tight_layout(w_pad=1.0)
     fig.savefig(os.path.join(OUT, "t1_correlation_binned.pdf"), bbox_inches="tight", dpi=200)
     fig.savefig(os.path.join(OUT, "t1_correlation_binned.png"), bbox_inches="tight", dpi=200)
     plt.close(fig)
     print("\nSaved binned bar chart.")
 
     # ── Figure 2: Model-level scatter with marker+color legend ──
-    fig2, axes2 = plt.subplots(1, 2, figsize=(9.5, FIG_HEIGHT), sharey=False,
-                                gridspec_kw={"right": 0.74})
+    fig2, axes2 = plt.subplots(1, 2, figsize=(6.8, FIG_HEIGHT), sharey=False,
+                                gridspec_kw={"right": 0.76})
 
     for ax, tname, vals in zip(axes2, tier_names, [agg_t0, agg_t2]):
         xvals = [100 * v for v in agg_t1]
         yvals = [100 * v for v in vals]
 
         for i, (lbl, color, marker, *_) in enumerate(model_agg):
-            ax.scatter(xvals[i], yvals[i], s=75, c=color, marker=marker,
-                       zorder=3, edgecolors="white", linewidth=0.7)
+            ax.scatter(xvals[i], yvals[i], s=55, c=color, marker=marker,
+                       zorder=3, edgecolors="white", linewidth=0.6)
 
         c = corr(agg_t1, vals)
         xf, yf = np.array(xvals), np.array(yvals)
         z = np.polyfit(xf, yf, 1)
         xline = np.linspace(min(xf) - 1.5, max(xf) + 1.5, 100)
-        ax.plot(xline, np.polyval(z, xline), "--", color="#bdbdbd", linewidth=1, zorder=1)
+        ax.plot(xline, np.polyval(z, xline), "--", color="#bdbdbd", linewidth=0.8, zorder=1)
 
-        ax.set_title(f"{tname}  (r = {c['pearson_r']:.2f}, ρ = {c['spearman_r']:.2f})",
-                     fontsize=12, fontweight="medium", pad=6)
-        ax.set_xlabel("Mean Tier 1 Accuracy (%)", fontsize=12)
+        ax.set_title(f"{tname}\n(r = {c['pearson_r']:.2f}, ρ = {c['spearman_r']:.2f})",
+                     fontsize=12, fontweight="medium", pad=4)
+        ax.set_xlabel("Mean Tier 1 Accuracy (%)", fontsize=11)
         if ax is axes2[0]:
-            ax.set_ylabel("Accuracy (%)", fontsize=12)
+            ax.set_ylabel("Accuracy (%)", fontsize=11)
         ax.grid(True, alpha=0.12, linewidth=0.4)
         ax.tick_params(axis="both", labelsize=10)
 
@@ -232,16 +232,16 @@ def main():
     for name in LEGEND_ORDER:
         color, marker = agg_by_name[name]
         h = matplotlib.lines.Line2D([], [], color=color, marker=marker, linestyle="None",
-                                     markersize=8, markeredgecolor="white", markeredgewidth=0.7,
+                                     markersize=7, markeredgecolor="white", markeredgewidth=0.6,
                                      label=name)
         legend_handles.append(h)
 
     fig2.legend(handles=legend_handles, loc="center right",
-                bbox_to_anchor=(0.99, 0.5), fontsize=9, frameon=True,
-                edgecolor="#dddddd", fancybox=False, handletextpad=0.4,
-                borderpad=0.6, labelspacing=0.5)
+                bbox_to_anchor=(0.99, 0.5), fontsize=10, frameon=True,
+                edgecolor="#dddddd", fancybox=False, handletextpad=0.3,
+                borderpad=0.5, labelspacing=0.4)
 
-    fig2.tight_layout(rect=[0, 0, 0.74, 1])
+    fig2.tight_layout(rect=[0, 0, 0.76, 1])
     fig2.savefig(os.path.join(OUT, "t1_correlation_scatter.pdf"), bbox_inches="tight", dpi=200)
     fig2.savefig(os.path.join(OUT, "t1_correlation_scatter.png"), bbox_inches="tight", dpi=200)
     plt.close(fig2)

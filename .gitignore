@@ -8,6 +8,8 @@
 .DS_Store
 ./playground/
 results/teaser/
+results/qualitative/
+release/
 
 # Python
 __pycache__/
