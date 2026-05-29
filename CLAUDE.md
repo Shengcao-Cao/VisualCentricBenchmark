@@ -10,6 +10,10 @@ coreset/
 ├── api_key.sh             # API keys (source before running)
 ├── tasks/                 # Pipeline task implementations
 │   ├── answer.py          # Tier0: answer questions with original images
+│   ├── answer_ablation.py # Ablation: text-only / caption / image+caption / recovered
+│   │                       # Tasks: answer_ablation, answer_tier2_ablation,
+│   │                       #        answer_tier2_recovered, ablation_judge, ablation_judge_tier2
+│   ├── answer_image_quality.py  # Image quality: original text + reproduced T3 image
 │   ├── answer_tier1.py    # Tier1: answer visual perception MCQs (A/B/C/D)
 │   ├── answer_tier2.py    # Tier2: answer pruned questions with original images
 │   ├── answer_tier3.py    # Tier3: answer edited questions with regenerated diagrams
@@ -54,6 +58,7 @@ coreset/
 │   ├── apply_minor_fixes.py  # Apply 170 minor_fix annotations to T1 questions
 │   ├── clean_merged.py     # Clean merged dataset (apply verdicts, filter T2)
 │   ├── copy_old_results.py  # Copy old predictions into new clean dataset files
+│   ├── build_release_data.py  # Build clean release data (visatom_*.json + images)
 │   ├── merge.py, sample.py, sample_100.py, deduplicate.py, ...
 │   └── test_tier1_raw.py  # Test model raw responses on tier1
 ├── shells/                # Shell scripts for batch inference
@@ -65,6 +70,8 @@ coreset/
 │   ├── tier3_physics.sh   # Tier3 physics inference + judging (regenerated diagrams)
 │   ├── eval_hard.sh       # Tier0 inference + judging
 │   ├── judge.sh           # Re-judge all tier0 with better_judge
+│   ├── ablation.sh        # Ablation experiments (text-only/caption/image+caption)
+│   ├── image_quality.sh   # Image quality experiments (original text + T3 image)
 │   ├── trivial_tier2.sh   # Run trivial detection + filtering
 │   ├── merge_annotated.sh # Merge annotators → trivial → fix → clean pipeline
 │   └── fix_*.sh, filter_*.sh, ...
@@ -75,6 +82,7 @@ coreset/
 │   ├── annotator.html              # Tier1/tier2 annotation UI
 │   ├── annotator_tier3.html        # Tier3 annotation UI
 │   ├── annotator_chemistry.html    # Chemistry annotation UI
+│   ├── annotate_image_quality.py   # Image equivalence re-annotation UI
 │   └── viewer*.html                # Read-only viewers
 ├── results/               # Evaluation results
 │   ├── check_tier0_results.py      # Generate tier0_results.md
@@ -84,9 +92,23 @@ coreset/
 │   ├── check_tier3_jpg_results.py  # Generate tier3_jpg_results.md (JPG)
 │   ├── check_tier3_2_results.py    # Generate tier3_2_results.md (edited+pruned)
 │   ├── tier*_results.md            # Markdown result reports
+│   ├── prompts.md                  # Prompt documentation for all tiers
 │   ├── t1_correlation/             # T1 perception → reasoning correlation analysis
 │   ├── per_source_analysis/        # Per-source-dataset T0 vs T3_2 analysis
-│   └── pruning_ratio/              # Pruning ratio vs accuracy drop analysis
+│   ├── pruning_ratio/              # Pruning ratio vs accuracy drop analysis
+│   ├── ablation/                   # Ablation analysis (modality contribution)
+│   └── distribution/               # Domain + question-type distribution plots
+├── prompts/               # Prompt design documents + prompt code
+│   ├── prompt.py          # All evaluation prompts (system/user for each tier)
+│   ├── atomic_caption.py  # Atomic caption generation prompts
+│   ├── tier1_question.py  # Tier1 perception question generation prompts
+│   ├── WORKFLOW.md        # Tier3 pipeline workflow documentation
+│   ├── atomic.md, tier1.md, tier2.md, tier3.md  # Tier design docs
+│   └── tier3_pipeline.{tex,pdf}  # Tier3 pipeline diagram (LaTeX)
+├── release/               # Public release package (git-ignored, not in this repo)
+│   │                       # Published at: https://github.com/Shengcao-Cao/VisAtom
+│   │                       # Dataset on HuggingFace: https://huggingface.co/datasets/VisAtom/VisAtom
+│   └── (visatom_*.json, simplified pipeline, example.sh, images)
 ├── logs/                  # All inference/judging log files
 └── visualizations/        # Distribution plots, dedup visualizations
 ```
@@ -256,11 +278,11 @@ python scripts/translate_chemistry.py -i data/chemistry_unreviewed_fixed_chinese
 - **Physics tier3 multi-image**: 43/226 physics problems have multiple original images but only 1 SVG is generated per task. These are skipped in `fix_physics_jpg.py`.
 - **Physics tier3 performance**: Models score *higher* on regenerated physics diagrams than originals (e.g. Flash-Lite +20%, Qwen3-VL +19%), suggesting clean renders are easier to parse than scanned/hand-drawn originals.
 - **Tier3 PNG transparency**: 312/313 tier3 PNGs have transparent backgrounds (RGBA). Models (especially GPT, Qwen) render transparent regions as black and claim images are blank. Use JPG versions (`tier3_figures_jpg/`) instead.
-- **OpenRouter Qwen3.5 reasoning default**: OpenRouter enables reasoning by default for Qwen3.5-397B even without `reasoning.enabled` param. The `OpenRouterClient` now explicitly passes `{"reasoning": {"enabled": False}}` when `thinking_effort="none"`. Old T1 results for this model (run before 2026-05-04) had reasoning inadvertently enabled and were re-run.
+- **OpenRouter Qwen3.5 reasoning default**: OpenRouter enables reasoning by default for Qwen3.5-397B even without `reasoning.enabled` param. The `OpenRouterClient` now always explicitly passes `{"reasoning": {"enabled": true/false}}` via `extra_body`. Old T1 results for this model (run before 2026-05-04) had reasoning inadvertently enabled and were re-run.
 - **Bedrock Converse thinking_effort**: The `BedrockConverseClient` does not pass `thinking_effort` to the Converse API. Qwen3-VL and Nova 2 Lite always use their default behavior. `KimiClient` passes `reasoning_config` via `additionalModelRequestFields` when `thinking_effort != "none"`.
 - **better_judge_tier2 on full dataset**: The judge crashes with `IndexError` on items without T2 entries (`tier2_questions: []`). The errors are logged but harmless — items with T2 are still judged correctly. Affects runs on the 2,711-item clean file (1,676 items have no T2).
 - **Kimi K2.5 rerun with thinking**: Kimi T0/T2/T3_2 were rerun with `--thinking-effort high` (reasoning enabled). Old results (no thinking) preserved as `*_kimi_k2_5_old*.json`. Canonical files now use thinking.
-- **Qwen3-VL rerun without token cap**: Qwen T0/T2/T3_2 were rerun without the 8000 max_tokens cap that truncated long answers. Old results preserved as `*_qwen3_vl_235b_a22b_old*.json`. Canonical files now use default max_tokens.
+- **Qwen3-VL rerun without token cap**: Qwen T0/T2/T3_2 were rerun without the 8000 max_tokens cap that truncated long answers. Old results preserved as `*_qwen3_vl_235b_a22b_old*.json`. Canonical files now use default max_tokens (64000). Kimi K2.5 default also raised to 64000.
 - **Gemma rate limits**: 30 RPM limit on Gemma-4-31B causes many tier1 sub-questions to fail after 5 retries. Re-run with `--skip-existing` and lower concurrency (`--concurrency 10`).
 - **Gemini-3.1-Pro T0 variance**: Original T0 run scored 70.3%; rerun scored 75.2% (+4.9pp). The rerun is now the canonical file.
 
@@ -285,11 +307,17 @@ python scripts/translate_chemistry.py -i data/chemistry_unreviewed_fixed_chinese
 - Corrected labels saved back to `data/filtered_data_with_solution_hard_tier3_2.json` (now 102 equivalent, 181 edited). Analysis uses `data/image_quality_equiv_subset_corrected.json` (102 items).
 - Results: on the corrected 102-item subset, reproduced images cause a small average drop (B−A ≈ −1.6 pp), likely within noise. The image swap itself is not a major factor.
 
-### Ablation Experiments (text-only / caption / image+caption)
-- `tasks/answer_ablation.py`, `shells/ablation.sh`
-- New pipeline tasks: `answer_ablation`, `answer_tier2_ablation`, `ablation_judge`, `ablation_judge_tier2` (use `--ablation-mode` flag)
-- Three modes: `text_only`, `text_caption`, `text_image_caption`. Runs on T0 and T2 for GPT-5.4, Gemini 3.1 Pro, Qwen3.5-397B.
+### Ablation Experiments (text-only / caption / image+caption / recovered)
+- `tasks/answer_ablation.py`, `shells/ablation.sh`, `results/ablation/`
+- Pipeline tasks: `answer_ablation`, `answer_tier2_ablation`, `answer_tier2_recovered`, `ablation_judge`, `ablation_judge_tier2` (use `--ablation-mode` flag)
+- Three ablation modes: `text_only`, `text_caption`, `text_image_caption`. Plus `answer_tier2_recovered` (T2 only: pruned text with atomic facts re-inserted + original images).
+- Models: GPT-5.4, Gemini 3.1 Pro, Qwen3.5-397B, Kimi K2.5.
 - Data: `data/ablation_subset_200.json` (200-item subset of T2 items)
+- Analysis: `results/ablation/ablation_analysis.py` → `ablation_analysis.md`, `ablation_results.{pdf,png}`
+
+### Distribution Analysis
+- `results/distribution/distribution.py` → `distribution.{pdf,png}`
+- Two pie charts: domain distribution and question-type distribution across the base dataset.
 
 ## Environment
 
